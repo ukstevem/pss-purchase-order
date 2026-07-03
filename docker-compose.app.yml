@@ -1,0 +1,36 @@
+services:
+  purchase-order:
+    image: ghcr.io/ukstevem/pss-purchase-order:${IMAGE_TAG:-latest}
+    container_name: purchase-order
+    restart: unless-stopped
+    # Portainer Stack > Environment variables (or shell `export` for
+    # local docker compose). Required at runtime:
+    #   NEXT_PUBLIC_SUPABASE_URL
+    #   NEXT_PUBLIC_SUPABASE_ANON_KEY
+    #   NEXT_PUBLIC_APP_URL
+    #   SUPABASE_URL
+    #   SUPABASE_SECRET_KEY
+    # The NEXT_PUBLIC_* values are also baked into the client bundle at
+    # build time (from platform-portal/.env when ./build.sh ran); passing
+    # them again at runtime is harmless and lets server-side code that
+    # imports @platform/supabase work too.
+    environment:
+      PORT: 3017
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY}
+    ports:
+      - "3017:3017"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3017/purchase-order/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+networks:
+  default:
+    name: platform_net
+    external: true
