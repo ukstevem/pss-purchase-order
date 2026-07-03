@@ -1,0 +1,29 @@
+# Dependencies & build output
+node_modules/
+.next/
+dist/
+out/
+
+# Env — secrets never get committed (.env.example IS committed)
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# Logs & OS junk
+*.log
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Generated output (PO PDFs etc.)
+output/
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key

@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "pss_purchase_order",
+  "project_id": "2f9739ab-c3d3-45d4-b123-1345ea7b465d"
+}
