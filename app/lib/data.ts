@@ -1,0 +1,238 @@
+import "server-only";
+import { getSupabaseAdmin } from "./supabase-admin";
+import type { Row } from "./po-logic";
+
+// Data layer mirroring the legacy app/supabase_client.py fetchers one-to-one.
+// Legacy line references point into C:\Dev\PSS\purchase_order (read-only
+// reference system) so parity can be audited.
+
+export interface ProjectPoSummary {
+  project_id: string;
+  draft: number;
+  active: number;
+}
+
+/** Legacy fetch_project_po_summary (supabase_client.py:979). */
+export async function fetchProjectPoSummary(): Promise<ProjectPoSummary[]> {
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb.from("active_po_list").select("project_id,status");
+  if (error) throw new Error(`active_po_list summary failed: ${error.message}`);
+
+  const agg = new Map<string, ProjectPoSummary>();
+  for (const row of (data ?? []) as Row[]) {
+    const pn = String(row.project_id ?? "—").trim() || "—";
+    const entry = agg.get(pn) ?? { project_id: pn, draft: 0, active: 0 };
+    const status = String(row.status ?? "").toLowerCase();
+    // Legacy counts every non-draft status (incl. cancelled/complete) as active.
+    if (status === "draft") entry.draft += 1;
+    else entry.active += 1;
+    agg.set(pn, entry);
+  }
+  return [...agg.values()].sort((a, b) =>
+    a.project_id < b.project_id ? -1 : a.project_id > b.project_id ? 1 : 0
+  );
+}
+
+export interface PoListFilters {
+  project?: string;
+  supplier?: string;
+  status?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  sort?: string;
+  dir?: string;
+}
+
+/** Legacy sort whitelist + direction default (routes.py:163-167). */
+export function normalizeSort(sort?: string, dir?: string): { sort: string; dir: "asc" | "desc" } {
+  const s = sort === "updated_at" ? "updated_at" : "po_number";
+  const d = String(dir ?? "desc").toLowerCase() === "asc" ? "asc" : "desc";
+  return { sort: s, dir: d as "asc" | "desc" };
+}
+
+/** Legacy fetch_active_pos_from_view (supabase_client.py:546). */
+export async function fetchActivePosFromView(f: PoListFilters): Promise<Row[]> {
+  const { sort, dir } = normalizeSort(f.sort, f.dir);
+  const sb = getSupabaseAdmin();
+  let q = sb.from("active_po_list").select("*");
+  if (f.project) q = q.ilike("project_id", `%${f.project}%`);
+  if (f.supplier) q = q.eq("supplier_name", f.supplier);
+  if (f.status) q = q.eq("status", f.status);
+  if (f.dateFrom) q = q.gte("updated_at", `${f.dateFrom}T00:00:00`);
+  if (f.dateTo) q = q.lt("updated_at", `${f.dateTo}T00:00:00`);
+  const { data, error } = await q.order(sort, { ascending: dir === "asc" });
+  if (error) throw new Error(`active_po_list failed: ${error.message}`);
+  return (data ?? []) as Row[];
+}
+
+/** Legacy fetch_projects_map (supabase_client.py:375 — last definition wins). */
+export async function fetchProjectOptions(): Promise<string[]> {
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("project_register")
+    .select("projectnumber")
+    .order("projectnumber", { ascending: true })
+    .limit(10000);
+  if (error) throw new Error(`project_register failed: ${error.message}`);
+  const names = (data ?? []).map((r: Row) => String(r.projectnumber ?? "").trim()).filter(Boolean);
+  return [...new Set(names)].sort();
+}
+
+/** Legacy fetch_suppliers (supabase_client.py:402 — last definition wins, names only). */
+export async function fetchSupplierOptions(): Promise<string[]> {
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("suppliers")
+    .select("name")
+    .order("name", { ascending: true })
+    .limit(10000);
+  if (error) throw new Error(`suppliers failed: ${error.message}`);
+  const names = (data ?? []).map((r: Row) => String(r.name ?? "").trim()).filter(Boolean);
+  return [...new Set(names)].sort();
+}
+
+export interface PoDetail extends Row {
+  suppliers?: Row | null;
+  po_metadata?: Row[] | null;
+  line_items?: Row[];
+  project_register?: Row | null;
+  delivery_contact?: Row | null;
+  delivery_address?: Row | null;
+}
+
+/** Legacy fetch_po_detail (supabase_client.py:827) — full composition. */
+export async function fetchPoDetail(poId: string): Promise<PoDetail | null> {
+  const sb = getSupabaseAdmin();
+
+  const { data: poRows, error } = await sb
+    .from("purchase_orders")
+    .select("*, suppliers(*), po_metadata(*)")
+    .eq("id", poId)
+    .eq("po_metadata.active", true);
+  if (error) throw new Error(`purchase_orders failed: ${error.message}`);
+  const po = (poRows ?? [])[0] as PoDetail | undefined;
+  if (!po) return null;
+  po.projectnumber = po.project_id;
+
+  if (po.projectnumber) {
+    const { data } = await sb
+      .from("project_register")
+      .select("*")
+      .eq("projectnumber", po.projectnumber)
+      .limit(1);
+    po.project_register = data?.[0] ?? null;
+  }
+
+  const { data: items, error: liError } = await sb
+    .from("po_line_items")
+    .select("*")
+    .eq("po_id", poId)
+    .eq("active", true);
+  if (liError) throw new Error(`po_line_items failed: ${liError.message}`);
+  po.line_items = (items ?? []) as Row[];
+
+  if (po.delivery_contact_id) {
+    const { data } = await sb
+      .from("delivery_contacts")
+      .select("*")
+      .eq("id", po.delivery_contact_id);
+    po.delivery_contact = data?.[0] ?? null;
+  }
+
+  // Delivery addresses live in `suppliers` (type delivery/both) — legacy L877-888.
+  if (po.manual_delivery_address === null || po.manual_delivery_address === undefined) {
+    let addressId = po.delivery_address_id;
+    if (!addressId && po.delivery_contact) addressId = po.delivery_contact.address_id;
+    if (addressId) {
+      const { data } = await sb.from("suppliers").select("*").eq("id", addressId);
+      po.delivery_address = data?.[0] ?? null;
+    }
+  }
+
+  return po;
+}
+
+/** Legacy fetch_accounts_overview (supabase_client.py:1020) — 1000-row offset loop. */
+export async function fetchAccountsOverview(): Promise<Row[]> {
+  const sb = getSupabaseAdmin();
+  const pageSize = 1000;
+  let offset = 0;
+  const rows: Row[] = [];
+  for (;;) {
+    const { data, error } = await sb
+      .from("accounts_overview")
+      .select("id,po_number,status,total_value,acc_complete,invoice_reference,projectnumber,supplier_name")
+      .order("po_number", { ascending: true })
+      .range(offset, offset + pageSize - 1);
+    if (error) {
+      // Legacy returns [] on a failed page.
+      console.error("[purchase-order] accounts_overview failed:", error.message);
+      return [];
+    }
+    const batch = (data ?? []) as Row[];
+    rows.push(...batch);
+    if (batch.length < pageSize) break;
+    offset += pageSize;
+  }
+  return rows;
+}
+
+/** Legacy fetch_accounts_overview_latest (supabase_client.py:492). */
+export async function fetchAccountsOverviewLatest(
+  statuses: string[] = ["approved", "issued", "complete"]
+): Promise<Row[]> {
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("accounts_overview")
+    .select("id,po_number,status,projectnumber,supplier_name,total_value")
+    .in("status", statuses)
+    .order("po_number", { ascending: true })
+    .limit(100000);
+  if (error) throw new Error(`accounts_overview failed: ${error.message}`);
+  return (data ?? []) as Row[];
+}
+
+/** Legacy fetch_last_issued_dates_any (supabase_client.py:624) — latest issued updated_at per po_number. */
+export async function fetchLastIssuedDates(
+  poNumbers: (string | number)[]
+): Promise<Record<string, string>> {
+  if (!poNumbers.length) return {};
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("purchase_orders")
+    .select("po_number,updated_at")
+    .in("po_number", poNumbers)
+    .eq("status", "issued")
+    .order("po_number", { ascending: true })
+    .order("updated_at", { ascending: false })
+    .limit(100000);
+  if (error) throw new Error(`purchase_orders issued dates failed: ${error.message}`);
+  const map: Record<string, string> = {};
+  for (const r of (data ?? []) as Row[]) {
+    const pn = String(r.po_number);
+    if (!(pn in map)) map[pn] = String(r.updated_at);
+  }
+  return map;
+}
+
+/**
+ * Legacy _fetch_line_items_for_po (blueprints/expediting.py:128), batched
+ * with po_id=in.(...) for the visible page instead of one call per PO.
+ */
+export async function fetchLineItemsForPos(poIds: string[]): Promise<Record<string, Row[]>> {
+  const map: Record<string, Row[]> = {};
+  if (!poIds.length) return map;
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("po_line_items")
+    .select("id,po_id,description,quantity,qty_received,exped_expected_date,exped_completed_date")
+    .in("po_id", poIds)
+    .eq("active", true)
+    .order("id", { ascending: true });
+  if (error) throw new Error(`po_line_items failed: ${error.message}`);
+  for (const r of (data ?? []) as Row[]) {
+    const k = String(r.po_id);
+    (map[k] ??= []).push(r);
+  }
+  return map;
+}
