@@ -13,6 +13,7 @@ import {
   type DueLineItem,
 } from "@/lib/data";
 import { addDays, endOfWorkWeek, orderProjectOptions, todayLondon } from "@/lib/po-logic";
+import { writesEnabled } from "@/lib/writes";
 
 export const dynamic = "force-dynamic";
 
@@ -153,9 +154,9 @@ export default async function ExpeditingPage({ searchParams }: { searchParams: P
         <>
           <p className="mb-3 text-sm text-zinc-500">
             Showing {startIndex}–{endIndex} of {total.toLocaleString("en-GB")} POs. Click a row to
-            view line items.
+            view line items{writesEnabled() ? " and edit receipt details" : ""}.
           </p>
-          <ExpeditingTable rows={rows} itemsByPo={itemsByPo} />
+          <ExpeditingTable rows={rows} itemsByPo={itemsByPo} writable={writesEnabled()} />
           {totalPages > 1 && (
             <div className="mt-4 flex items-center gap-2 text-sm">
               {page > 1 && (

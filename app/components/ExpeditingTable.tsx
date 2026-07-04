@@ -9,10 +9,12 @@ import {
   todayLondon,
   type Row,
 } from "@/lib/po-logic";
+import { updateLineItem } from "@/app/expediting/actions";
 
 // Legacy expediting.html — PO rows with a delivery flag and expandable
-// line-item detail. Read-only in phase 1: the legacy inline editing of
-// qty_received / expected / completed dates arrives with phase 2 writes.
+// line-item detail. With PO_WRITES_ENABLED (bead 9bq.24) the expansion rows
+// are editable with legacy JS parity: received clamped 0..qty, completed
+// date auto-stamped when fully received and cleared when reduced.
 
 const FLAG_TONE: Record<string, string> = {
   late: "bg-red-100 text-red-800",
@@ -34,18 +36,65 @@ const LINE_TONE: Record<string, string> = {
   none: "",
 };
 
-export function ExpeditingTable({
-  rows,
-  itemsByPo,
-}: {
+interface ExpeditingTableProps {
   rows: Row[];
   itemsByPo: Record<string, Row[]>;
-}) {
+  writable?: boolean;
+}
+
+export function ExpeditingTable({ rows, itemsByPo, writable = false }: ExpeditingTableProps) {
   const [openPo, setOpenPo] = useState<string | null>(null);
+  const [items, setItems] = useState<Record<string, Row[]>>(itemsByPo);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
   const today = todayLondon();
+
+  async function save(poId: string, item: Row, fields: Record<string, unknown>) {
+    const itemId = String(item.id);
+    setSavingId(itemId);
+    setSaveError(null);
+    try {
+      const result = await updateLineItem(itemId, fields);
+      if (!result.ok || !result.item) {
+        setSaveError(result.error ?? "Save failed.");
+        return;
+      }
+      const saved = result.item;
+      setItems((prev) => ({
+        ...prev,
+        [poId]: (prev[poId] ?? []).map((it) => (String(it.id) === itemId ? { ...it, ...saved } : it)),
+      }));
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  /** Legacy JS parity: clamp received, auto-stamp/clear completed date. */
+  function saveReceived(poId: string, item: Row, raw: string) {
+    const qty = Number(item.quantity ?? 0);
+    let received = Number(raw);
+    if (!Number.isFinite(received)) received = 0;
+    received = Math.min(Math.max(0, received), qty);
+
+    const fields: Record<string, unknown> = { qty_received: received };
+    const fullyReceived = qty > 0 && received >= qty;
+    if (fullyReceived && !item.exped_completed_date) {
+      fields.exped_completed_date = today;
+    } else if (!fullyReceived && item.exped_completed_date) {
+      fields.exped_completed_date = null;
+    }
+    void save(poId, item, fields);
+  }
 
   return (
     <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
+      {saveError && (
+        <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+          Save failed: {saveError}
+        </div>
+      )}
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-zinc-200 bg-zinc-50 text-left text-zinc-600">
@@ -60,8 +109,8 @@ export function ExpeditingTable({
         <tbody>
           {rows.map((po, i) => {
             const poId = String(po.id ?? po.purchase_order_id ?? i);
-            const items = itemsByPo[poId] ?? [];
-            const flag = poDeliveryStatus(items, today);
+            const poItems = items[poId] ?? [];
+            const flag = poDeliveryStatus(poItems, today);
             const isOpen = openPo === poId;
             return (
               <Fragment key={poId}>
@@ -92,7 +141,7 @@ export function ExpeditingTable({
                 {isOpen && (
                   <tr className="border-b border-zinc-100 bg-zinc-50/50">
                     <td colSpan={6} className="px-6 py-3">
-                      {items.length === 0 ? (
+                      {poItems.length === 0 ? (
                         <div className="text-sm text-zinc-500">No line items.</div>
                       ) : (
                         <table className="w-full table-fixed text-xs">
@@ -106,18 +155,74 @@ export function ExpeditingTable({
                             </tr>
                           </thead>
                           <tbody>
-                            {items.map((item, j) => (
-                              <tr
-                                key={String(item.id ?? j)}
-                                className={LINE_TONE[expedLineRowStatus(item, today)]}
-                              >
-                                <td className="px-2 py-1 whitespace-pre-line">{item.description ?? ""}</td>
-                                <td className="px-2 py-1 text-center">{Number(item.quantity ?? 0)}</td>
-                                <td className="px-2 py-1 text-center">{Number(item.qty_received ?? 0)}</td>
-                                <td className="px-2 py-1 text-center">{shortDate(item.exped_expected_date)}</td>
-                                <td className="px-2 py-1 text-center">{shortDate(item.exped_completed_date)}</td>
-                              </tr>
-                            ))}
+                            {poItems.map((item, j) => {
+                              const itemId = String(item.id ?? j);
+                              const saving = savingId === itemId;
+                              return (
+                                <tr
+                                  key={itemId}
+                                  className={`${LINE_TONE[expedLineRowStatus(item, today)]} ${saving ? "opacity-50" : ""}`}
+                                >
+                                  <td className="px-2 py-1 whitespace-pre-line">{item.description ?? ""}</td>
+                                  <td className="px-2 py-1 text-center">{Number(item.quantity ?? 0)}</td>
+                                  <td className="px-2 py-1 text-center">
+                                    {writable ? (
+                                      <input
+                                        key={`r-${item.qty_received ?? 0}`}
+                                        type="number"
+                                        min={0}
+                                        max={Number(item.quantity ?? 0)}
+                                        defaultValue={Number(item.qty_received ?? 0)}
+                                        disabled={saving}
+                                        onBlur={(e) => {
+                                          if (Number(e.target.value) !== Number(item.qty_received ?? 0)) {
+                                            saveReceived(poId, item, e.target.value);
+                                          }
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                                        }}
+                                        className="w-20 rounded border border-zinc-300 bg-white px-2 py-0.5 text-center"
+                                      />
+                                    ) : (
+                                      Number(item.qty_received ?? 0)
+                                    )}
+                                  </td>
+                                  <td className="px-2 py-1 text-center">
+                                    {writable ? (
+                                      <input
+                                        key={`e-${item.exped_expected_date ?? ""}`}
+                                        type="date"
+                                        defaultValue={String(item.exped_expected_date ?? "").slice(0, 10)}
+                                        disabled={saving}
+                                        onChange={(e) =>
+                                          void save(poId, item, { exped_expected_date: e.target.value || null })
+                                        }
+                                        className="rounded border border-zinc-300 bg-white px-2 py-0.5"
+                                      />
+                                    ) : (
+                                      shortDate(item.exped_expected_date)
+                                    )}
+                                  </td>
+                                  <td className="px-2 py-1 text-center">
+                                    {writable ? (
+                                      <input
+                                        key={`c-${item.exped_completed_date ?? ""}`}
+                                        type="date"
+                                        defaultValue={String(item.exped_completed_date ?? "").slice(0, 10)}
+                                        disabled={saving}
+                                        onChange={(e) =>
+                                          void save(poId, item, { exped_completed_date: e.target.value || null })
+                                        }
+                                        className="rounded border border-zinc-300 bg-white px-2 py-0.5"
+                                      />
+                                    ) : (
+                                      shortDate(item.exped_completed_date)
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       )}

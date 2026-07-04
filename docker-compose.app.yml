@@ -21,6 +21,9 @@ services:
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY}
+      # Stage-2 write gate — leave unset for read-only; set to "1" at
+      # write-cutover (runtime flag, restart applies it; no rebuild)
+      PO_WRITES_ENABLED: ${PO_WRITES_ENABLED:-}
     ports:
       - "3017:3017"
     healthcheck:

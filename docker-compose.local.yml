@@ -35,6 +35,8 @@ services:
       NEXT_PUBLIC_APP_URL: http://localhost:3017
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY}
+      # Stage-2 write gate — runtime, set in local/.env for clone dev (9bq.24)
+      PO_WRITES_ENABLED: ${PO_WRITES_ENABLED:-}
     ports:
       - "3017:3017"
     healthcheck:
