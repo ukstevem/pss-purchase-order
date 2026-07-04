@@ -1,8 +1,9 @@
 "use client";
 
-import { useAuth, AuthButton } from "@platform/auth";
+import { useAuth } from "@platform/auth";
 import { Spinner } from "@platform/ui";
 import { ReactNode } from "react";
+import { SignInPanel } from "@/components/SignInPanel";
 
 /**
  * Client-side sign-in gate (ecosystem pattern — no server-side route
@@ -31,7 +32,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
           />
           <h1 className="mb-1 text-lg font-semibold text-zinc-900">Purchase Orders</h1>
           <p className="mb-6 text-sm text-zinc-500">Sign in with your PSS account to continue.</p>
-          <AuthButton />
+          <SignInPanel />
         </div>
       </div>
     );

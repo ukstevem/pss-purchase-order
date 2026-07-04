@@ -2,11 +2,19 @@
 # exposes the app on port 3017, and does NOT join platform_net. For Pi
 # deployment use docker-compose.app.yml instead.
 #
-# Usage (from the repo root; secrets stay in platform-portal, nothing copied):
-#   docker compose --env-file ../platform-portal/.env -f docker-compose.local.yml up --build -d
+# Two modes, chosen by --env-file (run from the repo root):
+#
+#   LIVE Supabase, read-only testing (Azure sign-in):
+#     docker compose --env-file ../platform-portal/.env -f docker-compose.local.yml up --build -d
+#
+#   LOCAL Supabase clone at 10.0.0.85 — stage-2 write development (bead 9bq.22;
+#   local/.env is git-ignored and sets NEXT_PUBLIC_ALLOW_PASSWORD_AUTH=1 for
+#   the email/password dev sign-in, since the clone has no Azure OAuth):
+#     docker compose --env-file ./local/.env -f docker-compose.local.yml up --build -d
+#
 #   open http://localhost:3017/purchase-order/
 #
-# NEXT_PUBLIC_APP_URL is pinned to localhost so the Azure OAuth redirect
+# NEXT_PUBLIC_APP_URL is pinned to localhost so the OAuth redirect
 # returns here rather than to the gateway.
 
 services:
@@ -17,6 +25,7 @@ services:
         NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
         NEXT_PUBLIC_APP_URL: http://localhost:3017
+        NEXT_PUBLIC_ALLOW_PASSWORD_AUTH: ${NEXT_PUBLIC_ALLOW_PASSWORD_AUTH:-}
     container_name: purchase-order-local
     restart: unless-stopped
     environment:
