@@ -12,25 +12,46 @@ export interface ProjectPoSummary {
   active: number;
 }
 
-/** Legacy fetch_project_po_summary (supabase_client.py:979). */
+/**
+ * Dashboard summary. Project list comes from project_register (canonical —
+ * the legacy PO-derived list surfaced deprecated project ids; bead 9bq.8);
+ * PO counts still aggregate from active_po_list per the legacy rule
+ * (fetch_project_po_summary, supabase_client.py:979). Projects with no POs
+ * are included with zero counts.
+ */
 export async function fetchProjectPoSummary(): Promise<ProjectPoSummary[]> {
   const sb = getSupabaseAdmin();
-  const { data, error } = await sb.from("active_po_list").select("project_id,status");
-  if (error) throw new Error(`active_po_list summary failed: ${error.message}`);
+  const [projRes, poRes] = await Promise.all([
+    sb.from("project_register").select("projectnumber").limit(10000),
+    sb.from("active_po_list").select("project_id,status"),
+  ]);
+  if (projRes.error) throw new Error(`project_register failed: ${projRes.error.message}`);
+  if (poRes.error) throw new Error(`active_po_list summary failed: ${poRes.error.message}`);
 
-  const agg = new Map<string, ProjectPoSummary>();
-  for (const row of (data ?? []) as Row[]) {
-    const pn = String(row.project_id ?? "—").trim() || "—";
-    const entry = agg.get(pn) ?? { project_id: pn, draft: 0, active: 0 };
+  const counts = new Map<string, { draft: number; active: number }>();
+  for (const row of (poRes.data ?? []) as Row[]) {
+    const pn = String(row.project_id ?? "").trim();
+    if (!pn) continue;
+    const c = counts.get(pn) ?? { draft: 0, active: 0 };
     const status = String(row.status ?? "").toLowerCase();
     // Legacy counts every non-draft status (incl. cancelled/complete) as active.
-    if (status === "draft") entry.draft += 1;
-    else entry.active += 1;
-    agg.set(pn, entry);
+    if (status === "draft") c.draft += 1;
+    else c.active += 1;
+    counts.set(pn, c);
   }
-  return [...agg.values()].sort((a, b) =>
-    a.project_id < b.project_id ? -1 : a.project_id > b.project_id ? 1 : 0
-  );
+
+  const numbers = [
+    ...new Set(
+      (projRes.data ?? [])
+        .map((r: Row) => String(r.projectnumber ?? "").trim())
+        .filter(Boolean)
+    ),
+  ];
+  return numbers.map((pn) => ({
+    project_id: pn,
+    draft: counts.get(pn)?.draft ?? 0,
+    active: counts.get(pn)?.active ?? 0,
+  }));
 }
 
 export interface PoListFilters {
