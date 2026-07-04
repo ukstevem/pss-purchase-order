@@ -85,19 +85,71 @@ export function normalizeSort(sort?: string, dir?: string): { sort: string; dir:
   return { sort: s, dir: d as "asc" | "desc" };
 }
 
-/** Legacy fetch_active_pos_from_view (supabase_client.py:546). */
-export async function fetchActivePosFromView(f: PoListFilters): Promise<Row[]> {
-  const { sort, dir } = normalizeSort(f.sort, f.dir);
-  const sb = getSupabaseAdmin();
-  let q = sb.from("active_po_list").select("*");
+// Filter application shared by the list fetchers — semantics mirror legacy
+// fetch_active_pos_from_view (supabase_client.py:546).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyPoFilters<T extends { ilike: any; eq: any; gte: any; lt: any }>(
+  q: T,
+  f: PoListFilters
+): T {
   if (f.project) q = q.ilike("project_id", `%${f.project}%`);
   if (f.supplier) q = q.eq("supplier_name", f.supplier);
   if (f.status) q = q.eq("status", f.status);
   if (f.dateFrom) q = q.gte("updated_at", `${f.dateFrom}T00:00:00`);
   if (f.dateTo) q = q.lt("updated_at", `${f.dateTo}T00:00:00`);
+  return q;
+}
+
+/** Legacy fetch_active_pos_from_view (supabase_client.py:546). */
+export async function fetchActivePosFromView(f: PoListFilters): Promise<Row[]> {
+  const { sort, dir } = normalizeSort(f.sort, f.dir);
+  const sb = getSupabaseAdmin();
+  const q = applyPoFilters(sb.from("active_po_list").select("*"), f);
   const { data, error } = await q.order(sort, { ascending: dir === "asc" });
   if (error) throw new Error(`active_po_list failed: ${error.message}`);
   return (data ?? []) as Row[];
+}
+
+export interface PoListPage {
+  rows: Row[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+/**
+ * Server-side paginated PO list (bead 9bq.16): exact count first (page
+ * clamped to range), then a 50-row window. Supersedes the 1000-row
+ * truncation of the unpaginated fetch (bead 9bq.10).
+ */
+export async function fetchActivePosPage(
+  f: PoListFilters,
+  page: number,
+  pageSize = 50
+): Promise<PoListPage> {
+  const { sort, dir } = normalizeSort(f.sort, f.dir);
+  const sb = getSupabaseAdmin();
+
+  const countQ = applyPoFilters(
+    sb.from("active_po_list").select("id", { count: "exact", head: true }),
+    f
+  );
+  const { count, error: countError } = await countQ;
+  if (countError) throw new Error(`active_po_list count failed: ${countError.message}`);
+
+  const total = count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const clamped = Math.min(Math.max(1, page), totalPages);
+  if (total === 0) return { rows: [], total: 0, page: 1, totalPages: 1 };
+
+  const from = (clamped - 1) * pageSize;
+  const rowsQ = applyPoFilters(sb.from("active_po_list").select("*"), f);
+  const { data, error } = await rowsQ
+    .order(sort, { ascending: dir === "asc" })
+    .range(from, from + pageSize - 1);
+  if (error) throw new Error(`active_po_list page failed: ${error.message}`);
+
+  return { rows: (data ?? []) as Row[], total, page: clamped, totalPages };
 }
 
 /** Legacy fetch_projects_map (supabase_client.py:375 — last definition wins). */
