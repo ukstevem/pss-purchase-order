@@ -2,12 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 
+export type SearchOption = string | { value: string; label: string };
+
 interface SearchSelectProps {
   value: string;
-  options: string[];
+  options: SearchOption[];
   placeholder: string;
-  /** Called with the chosen option, or "" to clear the filter. */
+  /** Called with the chosen option's value, or "" to clear. */
   onSelect: (value: string) => void;
+}
+
+function normalizeOptions(options: SearchOption[]): { value: string; label: string }[] {
+  return options.map((o) => (typeof o === "string" ? { value: o, label: o } : o));
 }
 
 /** Lowercase and collapse punctuation to spaces, so "c rob" ≈ "C. Rob…" (9bq.13). */
@@ -27,36 +33,41 @@ function normalize(s: string): string {
  * the first match, Escape reverts, × clears.
  */
 export function SearchSelect({ value, options, placeholder, onSelect }: SearchSelectProps) {
-  const [text, setText] = useState(value);
+  const opts = normalizeOptions(options);
+  const labelFor = (v: string) => opts.find((o) => o.value === v)?.label ?? v;
+
+  const [text, setText] = useState(value ? labelFor(value) : "");
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => setText(value), [value]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => setText(value ? labelFor(value) : ""), [value]);
 
   const tokens = normalize(text).split(" ").filter(Boolean);
   const matches = (
     tokens.length
-      ? options.filter((o) => {
-          const n = normalize(o);
+      ? opts.filter((o) => {
+          const n = normalize(o.label);
           return tokens.every((t) => n.includes(t));
         })
-      : options
+      : opts
   ).slice(0, 50);
 
   useEffect(() => {
     function onDocMouseDown(e: MouseEvent) {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
         setOpen(false);
-        setText(value); // revert unconfirmed typing
+        setText(value ? labelFor(value) : ""); // revert unconfirmed typing
       }
     }
     document.addEventListener("mousedown", onDocMouseDown);
     return () => document.removeEventListener("mousedown", onDocMouseDown);
-  }, [value]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, options]);
 
   function choose(v: string) {
     setOpen(false);
-    setText(v);
+    setText(v ? labelFor(v) : "");
     onSelect(v);
   }
 
@@ -74,10 +85,10 @@ export function SearchSelect({ value, options, placeholder, onSelect }: SearchSe
         onKeyDown={(e) => {
           if (e.key === "Enter" && matches.length > 0) {
             e.preventDefault();
-            choose(matches[0]);
+            choose(matches[0].value);
           } else if (e.key === "Escape") {
             setOpen(false);
-            setText(value);
+            setText(value ? labelFor(value) : "");
           }
         }}
         className="w-56 rounded-md border border-zinc-300 bg-white px-3 py-1.5 pr-7 text-sm"
@@ -95,13 +106,13 @@ export function SearchSelect({ value, options, placeholder, onSelect }: SearchSe
       {open && matches.length > 0 && (
         <ul className="absolute z-20 mt-1 max-h-64 w-72 overflow-y-auto rounded-md border border-zinc-200 bg-white shadow-lg">
           {matches.map((o) => (
-            <li key={o}>
+            <li key={o.value}>
               <button
                 type="button"
-                onClick={() => choose(o)}
+                onClick={() => choose(o.value)}
                 className="block w-full px-3 py-1.5 text-left text-sm hover:bg-zinc-100"
               >
-                {o}
+                {o.label}
               </button>
             </li>
           ))}

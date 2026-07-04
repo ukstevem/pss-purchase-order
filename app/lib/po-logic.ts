@@ -162,6 +162,78 @@ export function orderProjectOptions(projects: string[]): string[] {
   return [...sticky, ...rest];
 }
 
+// --- Status / revision state machine (legacy utils/revision.py,
+// utils/status_utils.py, and routes.py edit_po inline helpers) ---
+
+export const PO_STATUSES = ["draft", "approved", "issued", "complete", "cancelled"] as const;
+export type PoStatus = (typeof PO_STATUSES)[number];
+const STATUS_FLOW: PoStatus[] = ["draft", "approved", "issued", "complete"];
+const TERMINAL_STATUSES = new Set<string>(["complete", "cancelled"]);
+
+export function validatePoStatus(status: string): PoStatus {
+  const s = status.trim().toLowerCase();
+  if (!(PO_STATUSES as readonly string[]).includes(s)) {
+    throw new Error(`Invalid PO status: '${status}'`);
+  }
+  return s as PoStatus;
+}
+
+/** Legacy allowed_next_statuses: terminals frozen; else forward + cancel. */
+export function allowedNextStatuses(current: string): PoStatus[] {
+  const cur = (current || "draft").trim().toLowerCase() as PoStatus;
+  if (TERMINAL_STATUSES.has(cur)) return [cur];
+  const idx = STATUS_FLOW.indexOf(cur);
+  const forward = STATUS_FLOW.slice(idx >= 0 ? idx : 0);
+  return [...forward, "cancelled"];
+}
+
+/** Legacy revision.get_next_revision: a→b … (z throws), "1"→"2". */
+export function getNextRevision(current: string): string {
+  const rev = String(current ?? "").trim();
+  if (/^[a-z]$/.test(rev)) {
+    if (rev === "z") throw new Error("Revision limit reached (Z)");
+    return String.fromCharCode(rev.charCodeAt(0) + 1);
+  }
+  if (/^\d+$/.test(rev)) return String(Number(rev) + 1);
+  throw new Error(`Invalid revision format: '${current}'`);
+}
+
+function isNumericGe1(rev: unknown): boolean {
+  const n = Number.parseInt(String(rev ?? "").trim(), 10);
+  return Number.isFinite(n) && n >= 1;
+}
+
+/** Legacy routes.py _coerce_rev_on_leaving_draft (L553-557). */
+export function coerceRevOnLeavingDraft(prevRev: string, oldStatus: string, newStatus: string): string {
+  if ((oldStatus || "").toLowerCase() === "draft" && (newStatus || "").toLowerCase() !== "draft") {
+    return isNumericGe1(prevRev) ? String(prevRev).trim() : "1";
+  }
+  return prevRev;
+}
+
+/** Legacy revision.compute_updated_revision: only draft→approved forces "1". */
+export function computeUpdatedRevision(currentRev: string, currentStatus: string, newStatus: string): string {
+  if (
+    (currentStatus || "").toLowerCase() === "draft" &&
+    (newStatus || "").toLowerCase() === "approved"
+  ) {
+    return isNumericGe1(currentRev) ? String(currentRev).trim() : "1";
+  }
+  return currentRev;
+}
+
+function revToInt(rev: unknown): number | null {
+  const s = String(rev ?? "").trim();
+  return /^\d+$/.test(s) ? Number(s) : null;
+}
+
+/** Legacy routes.py _should_stamp_release: alpha→numeric or numeric increase. */
+export function shouldStampRelease(prevRev: string, newRev: string): boolean {
+  const prevNum = revToInt(prevRev);
+  const newNum = revToInt(newRev);
+  return newNum !== null && (prevNum === null || newNum > prevNum);
+}
+
 /** Legacy accounts is_completed(row) (blueprints/accounts.py:40-48). */
 export function accountsIsCompleted(row: Row): boolean {
   const v = row.acc_complete;

@@ -63,12 +63,20 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   return (
     <div className="p-8">
       <PageHeader title="Purchase Orders by Project">
-        <Link
-          href="/po-list/"
-          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700"
-        >
-          📋 View All POs
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/po-list/"
+            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700"
+          >
+            📋 View All POs
+          </Link>
+          <Link
+            href="/po/new/"
+            className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-100"
+          >
+            ➕ Create New PO
+          </Link>
+        </div>
       </PageHeader>
 
       {error && <Alert variant="error">Failed to load dashboard: {error}</Alert>}

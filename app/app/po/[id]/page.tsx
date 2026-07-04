@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { PageHeader, Alert } from "@platform/ui";
 import { fetchPoDetail } from "@/lib/data";
 import { formatPoNumber, formatDate, accounting, qtyFormat } from "@/lib/format";
 import { sortPoLineItems, lineExpedStatus, type Row } from "@/lib/po-logic";
+import { writesEnabled } from "@/lib/writes";
 
 export const dynamic = "force-dynamic";
 
@@ -64,9 +66,21 @@ export default async function PoPreviewPage({ params }: { params: Promise<{ id: 
   const contactPhone = dcont?.phone ?? md.manual_contact_phone;
   const contactEmail = dcont?.email ?? md.manual_contact_email;
 
+  const status = String(po.status ?? "").toLowerCase();
+  const editable = writesEnabled() && status !== "complete" && status !== "cancelled";
+
   return (
     <div className="p-8">
-      <PageHeader title="Purchase Order" backHref="/po-list/" backLabel="Back to PO list" />
+      <PageHeader title="Purchase Order" backHref="/po-list/" backLabel="Back to PO list">
+        {editable && (
+          <Link
+            href={`/po/${id}/edit/`}
+            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700"
+          >
+            ✏️ Edit PO
+          </Link>
+        )}
+      </PageHeader>
 
       <div className="max-w-4xl rounded-lg border border-zinc-200 bg-white p-6">
         {/* Header block (po_web.html L48-63) */}

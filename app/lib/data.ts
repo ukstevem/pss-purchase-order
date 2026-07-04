@@ -178,6 +178,60 @@ export async function fetchSupplierOptions(): Promise<string[]> {
   return [...new Set(names)].sort();
 }
 
+export interface ProjectItemOption {
+  projectnumber: string;
+  item_seq: number;
+  line_desc: string | null;
+}
+
+/** Create/edit form combo source (legacy routes.py:376-384). */
+export async function fetchProjectItemOptions(): Promise<ProjectItemOption[]> {
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("project_register_items")
+    .select("projectnumber,item_seq,line_desc")
+    .order("projectnumber", { ascending: true })
+    .order("item_seq", { ascending: true })
+    .limit(10000);
+  if (error) throw new Error(`project_register_items failed: ${error.message}`);
+  return (data ?? []) as ProjectItemOption[];
+}
+
+/** Legacy suppliers_as_objects — id + name (no type filter, parity). */
+export async function fetchSuppliersAsObjects(): Promise<{ id: string; name: string }[]> {
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("suppliers")
+    .select("id,name")
+    .order("name", { ascending: true })
+    .limit(10000);
+  if (error) throw new Error(`suppliers failed: ${error.message}`);
+  return (data ?? []) as { id: string; name: string }[];
+}
+
+/** Legacy fetch_delivery_addresses — suppliers rows typed delivery/both. */
+export async function fetchDeliveryAddresses(): Promise<Row[]> {
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("suppliers")
+    .select("id,name,address_line1,postcode,type")
+    .in("type", ["delivery", "both"])
+    .order("name", { ascending: true });
+  if (error) throw new Error(`delivery addresses failed: ${error.message}`);
+  return (data ?? []) as Row[];
+}
+
+/** Legacy fetch_delivery_contacts. */
+export async function fetchDeliveryContacts(): Promise<Row[]> {
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("delivery_contacts")
+    .select("id,name,email,phone,address_id")
+    .order("name", { ascending: true });
+  if (error) throw new Error(`delivery_contacts failed: ${error.message}`);
+  return (data ?? []) as Row[];
+}
+
 export interface PoDetail extends Row {
   suppliers?: Row | null;
   po_metadata?: Row[] | null;
@@ -200,6 +254,11 @@ export async function fetchPoDetail(poId: string): Promise<PoDetail | null> {
   const po = (poRows ?? [])[0] as PoDetail | undefined;
   if (!po) return null;
   po.projectnumber = po.project_id;
+  // po_metadata.po_id is UNIQUE, so PostgREST embeds it as a single object;
+  // normalise to an array so downstream code has one shape.
+  if (po.po_metadata && !Array.isArray(po.po_metadata)) {
+    po.po_metadata = [po.po_metadata as unknown as Row];
+  }
 
   if (po.projectnumber) {
     const { data } = await sb
