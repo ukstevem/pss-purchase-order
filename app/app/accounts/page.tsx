@@ -1,8 +1,9 @@
 import { PageHeader, Alert, EmptyState } from "@platform/ui";
 import { FilterBar } from "@/components/FilterBar";
+import { AccountsTable } from "@/components/AccountsTable";
 import { fetchAccountsOverview } from "@/lib/data";
-import { formatPoNumber, accountingNumber } from "@/lib/format";
 import { accountsIsCompleted, orderProjectOptions, type Row } from "@/lib/po-logic";
+import { writesEnabled } from "@/lib/writes";
 
 export const dynamic = "force-dynamic";
 
@@ -80,43 +81,12 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
       {error && <Alert variant="error">Failed to load accounts: {error}</Alert>}
       {!error && filtered.length === 0 && <EmptyState message="No purchase orders found." />}
 
-      {filtered.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-zinc-200 bg-zinc-50 text-left text-zinc-600">
-                <th className="px-4 py-2 font-medium">PO Number</th>
-                <th className="px-4 py-2 font-medium">Project Number</th>
-                <th className="px-4 py-2 font-medium">Supplier</th>
-                <th className="px-4 py-2 font-medium">Status</th>
-                <th className="px-4 py-2 text-right font-medium">Total Value</th>
-                <th className="px-4 py-2 text-center font-medium">Complete</th>
-                <th className="px-4 py-2 font-medium">Invoice Reference</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((po, i) => (
-                <tr key={String(po.id ?? i)} className="border-b border-zinc-100 last:border-0">
-                  <td className="px-4 py-2 font-medium text-zinc-900">{formatPoNumber(po.po_number)}</td>
-                  <td className="px-4 py-2">{po.projectnumber ?? ""}</td>
-                  <td className="px-4 py-2">{po.supplier_name ?? ""}</td>
-                  <td className="px-4 py-2 capitalize">{String(po.status ?? "")}</td>
-                  <td className="px-4 py-2 text-right">{accountingNumber(po.total_value)}</td>
-                  <td className="px-4 py-2 text-center">
-                    <input type="checkbox" checked={Boolean(po.acc_complete)} disabled readOnly />
-                  </td>
-                  <td className="px-4 py-2">{po.invoice_reference ?? ""}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {filtered.length > 0 && <AccountsTable rows={filtered} writable={writesEnabled()} />}
 
-      {filtered.length > 0 && (
+      {filtered.length > 0 && !writesEnabled() && (
         <p className="mt-3 text-xs text-zinc-400">
-          Read-only preview — completion flags and invoice references are edited in the legacy
-          system until phase 2 writes are enabled.
+          Read-only — completion flags and invoice references are edited in the legacy system
+          until writes are enabled.
         </p>
       )}
     </div>
