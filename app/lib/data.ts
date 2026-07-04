@@ -1,6 +1,6 @@
 import "server-only";
 import { getSupabaseAdmin } from "./supabase-admin";
-import type { Row } from "./po-logic";
+import { poDeliveryStatus, type Row } from "./po-logic";
 
 // Data layer mirroring the legacy app/supabase_client.py fetchers one-to-one.
 // Legacy line references point into C:\Dev\PSS\purchase_order (read-only
@@ -304,22 +304,138 @@ export async function fetchLastIssuedDates(
 
 /**
  * Legacy _fetch_line_items_for_po (blueprints/expediting.py:128), batched
- * with po_id=in.(...) for the visible page instead of one call per PO.
+ * with po_id=in.(...) — chunked so large id sets (delivery-filter path,
+ * bead 9bq.19) don't overflow the request URL.
  */
 export async function fetchLineItemsForPos(poIds: string[]): Promise<Record<string, Row[]>> {
   const map: Record<string, Row[]> = {};
   if (!poIds.length) return map;
   const sb = getSupabaseAdmin();
-  const { data, error } = await sb
-    .from("po_line_items")
-    .select("id,po_id,description,quantity,qty_received,exped_expected_date,exped_completed_date")
-    .in("po_id", poIds)
-    .eq("active", true)
-    .order("id", { ascending: true });
-  if (error) throw new Error(`po_line_items failed: ${error.message}`);
-  for (const r of (data ?? []) as Row[]) {
-    const k = String(r.po_id);
-    (map[k] ??= []).push(r);
+  const CHUNK = 150;
+  const chunks: string[][] = [];
+  for (let i = 0; i < poIds.length; i += CHUNK) chunks.push(poIds.slice(i, i + CHUNK));
+
+  const results = await Promise.all(
+    chunks.map((ids) =>
+      sb
+        .from("po_line_items")
+        .select("id,po_id,description,quantity,qty_received,exped_expected_date,exped_completed_date")
+        .in("po_id", ids)
+        .eq("active", true)
+        .order("id", { ascending: true })
+    )
+  );
+  for (const { data, error } of results) {
+    if (error) throw new Error(`po_line_items failed: ${error.message}`);
+    for (const r of (data ?? []) as Row[]) {
+      const k = String(r.po_id);
+      (map[k] ??= []).push(r);
+    }
   }
   return map;
+}
+
+export interface ExpeditingPageData {
+  rows: Row[];
+  itemsByPo: Record<string, Row[]>;
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+/**
+ * Expediting list (bead 9bq.19). Without a delivery filter this is the same
+ * count+range pagination as the PO list, with line items fetched only for
+ * the visible page. A delivery filter needs flags for every matching PO
+ * (they're derived from line items, not stored), so that path fetches all
+ * matching POs + line items, filters, then paginates in memory.
+ */
+export async function fetchExpeditingPage(
+  f: PoListFilters,
+  delivery: string | undefined,
+  page: number,
+  pageSize = 50
+): Promise<ExpeditingPageData> {
+  const poId = (po: Row) => String(po.id ?? po.purchase_order_id ?? "");
+
+  if (!delivery) {
+    const res = await fetchActivePosPage(f, page, pageSize);
+    const itemsByPo = await fetchLineItemsForPos(res.rows.map(poId).filter(Boolean));
+    return { rows: res.rows, itemsByPo, total: res.total, page: res.page, totalPages: res.totalPages };
+  }
+
+  const { sort, dir } = normalizeSort(f.sort, f.dir);
+  const sb = getSupabaseAdmin();
+  const all: Row[] = [];
+  const batch = 1000;
+  let offset = 0;
+  for (;;) {
+    const q = applyPoFilters(sb.from("active_po_list").select("*"), f);
+    const { data, error } = await q
+      .order(sort, { ascending: dir === "asc" })
+      .range(offset, offset + batch - 1);
+    if (error) throw new Error(`active_po_list failed: ${error.message}`);
+    const rows = (data ?? []) as Row[];
+    all.push(...rows);
+    if (rows.length < batch) break;
+    offset += batch;
+  }
+
+  const itemsAll = await fetchLineItemsForPos(all.map(poId).filter(Boolean));
+  const matching = all.filter((po) => poDeliveryStatus(itemsAll[poId(po)] ?? []) === delivery);
+
+  const total = matching.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const clamped = Math.min(Math.max(1, page), totalPages);
+  const rows = matching.slice((clamped - 1) * pageSize, clamped * pageSize);
+  const itemsByPo: Record<string, Row[]> = {};
+  for (const po of rows) itemsByPo[poId(po)] = itemsAll[poId(po)] ?? [];
+
+  return { rows, itemsByPo, total, page: clamped, totalPages };
+}
+
+export interface DueLineItem extends Row {
+  po_number?: number | string;
+  project_id?: string;
+  supplier_name?: string;
+}
+
+/**
+ * Outstanding line items due in a date window (bead 9bq.21): active, no
+ * completed date, not fully received, on approved/issued POs. Window keys
+ * are inclusive YYYY-MM-DD.
+ */
+export async function fetchDueLineItems(fromKey: string, toKey: string): Promise<DueLineItem[]> {
+  if (fromKey > toKey) return [];
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("po_line_items")
+    .select(
+      "id,po_id,description,quantity,qty_received,exped_expected_date," +
+        "purchase_orders!inner(id,po_number,project_id,status,suppliers(name))"
+    )
+    .eq("active", true)
+    .is("exped_completed_date", null)
+    .gte("exped_expected_date", fromKey)
+    .lte("exped_expected_date", toKey)
+    .in("purchase_orders.status", ["approved", "issued"])
+    .order("exped_expected_date", { ascending: true });
+  if (error) throw new Error(`due line items failed: ${error.message}`);
+
+  return ((data ?? []) as Row[])
+    .filter((r) => {
+      const qty = Number(r.quantity ?? 0);
+      const received = Number(r.qty_received ?? 0);
+      return !(qty > 0 && received >= qty); // drop fully-received lines
+    })
+    .map((r) => {
+      const po = Array.isArray(r.purchase_orders) ? r.purchase_orders[0] : r.purchase_orders;
+      const sup = po && (Array.isArray(po.suppliers) ? po.suppliers[0] : po.suppliers);
+      return {
+        ...r,
+        po_number: po?.po_number,
+        project_id: po?.project_id,
+        supplier_name: sup?.name ?? "",
+      } as DueLineItem;
+    });
 }

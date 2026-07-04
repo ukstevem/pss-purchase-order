@@ -95,14 +95,14 @@ export function ExpeditingTable({
                       {items.length === 0 ? (
                         <div className="text-sm text-zinc-500">No line items.</div>
                       ) : (
-                        <table className="w-full text-xs">
+                        <table className="w-full table-fixed text-xs">
                           <thead>
-                            <tr className="text-left text-zinc-500">
-                              <th className="px-2 py-1 font-medium">Description</th>
-                              <th className="px-2 py-1 text-right font-medium">Qty</th>
-                              <th className="px-2 py-1 text-right font-medium">Received</th>
-                              <th className="px-2 py-1 font-medium">Expected</th>
-                              <th className="px-2 py-1 font-medium">Completed</th>
+                            <tr className="text-zinc-500">
+                              <th className="w-2/5 px-2 py-1 text-left font-medium">Description</th>
+                              <th className="px-2 py-1 text-center font-medium">Qty</th>
+                              <th className="px-2 py-1 text-center font-medium">Received</th>
+                              <th className="px-2 py-1 text-center font-medium">Expected</th>
+                              <th className="px-2 py-1 text-center font-medium">Completed</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -112,10 +112,10 @@ export function ExpeditingTable({
                                 className={LINE_TONE[expedLineRowStatus(item, today)]}
                               >
                                 <td className="px-2 py-1 whitespace-pre-line">{item.description ?? ""}</td>
-                                <td className="px-2 py-1 text-right">{Number(item.quantity ?? 0)}</td>
-                                <td className="px-2 py-1 text-right">{Number(item.qty_received ?? 0)}</td>
-                                <td className="px-2 py-1">{shortDate(item.exped_expected_date)}</td>
-                                <td className="px-2 py-1">{shortDate(item.exped_completed_date)}</td>
+                                <td className="px-2 py-1 text-center">{Number(item.quantity ?? 0)}</td>
+                                <td className="px-2 py-1 text-center">{Number(item.qty_received ?? 0)}</td>
+                                <td className="px-2 py-1 text-center">{shortDate(item.exped_expected_date)}</td>
+                                <td className="px-2 py-1 text-center">{shortDate(item.exped_completed_date)}</td>
                               </tr>
                             ))}
                           </tbody>

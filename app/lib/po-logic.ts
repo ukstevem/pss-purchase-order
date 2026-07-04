@@ -130,6 +130,23 @@ export function sortPoLineItems<T extends Row>(items: T[]): T[] {
     .map((x) => x.item);
 }
 
+/** Add n days to a YYYY-MM-DD key. */
+export function addDays(dateKey: string, n: number): string {
+  const d = new Date(`${dateKey}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Friday of the current work week for a YYYY-MM-DD key; on Sat/Sun this is
+ * the *coming* Friday (bead 9bq.21).
+ */
+export function endOfWorkWeek(dateKey: string): string {
+  const dow = new Date(`${dateKey}T00:00:00Z`).getUTCDay(); // 0 Sun … 6 Sat
+  const toFriday = dow <= 5 ? 5 - dow : 6;
+  return addDays(dateKey, toFriday);
+}
+
 /** Projects pinned to the top of dashboards and pick-lists (Steve, 2026-07-04). */
 export const STICKY_PROJECTS = ["0005", "0006"];
 
