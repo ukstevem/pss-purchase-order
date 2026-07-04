@@ -194,6 +194,21 @@ export async function savePoEdit(payload: EditPoPayload): Promise<SavePoResult> 
       error: `Stale revision: PO is at '${currentRev}', your form loaded '${payload.expectedRevision}'. Reload and retry.`,
     };
   }
+  // Superseded rows keep their revision but lose their active metadata —
+  // that's how the snapshot model marks "a newer revision exists".
+  const { data: activeMeta, error: metaError } = await sb
+    .from("po_metadata")
+    .select("id")
+    .eq("po_id", payload.poId)
+    .eq("active", true)
+    .limit(1);
+  if (metaError) return { ok: false, error: metaError.message };
+  if (!activeMeta?.length) {
+    return {
+      ok: false,
+      error: `Stale revision: a newer revision of PO ${po.po_number} already exists. Reload and retry.`,
+    };
+  }
   let newStatus: string;
   try {
     newStatus = validatePoStatus(payload.status || currentStatus);

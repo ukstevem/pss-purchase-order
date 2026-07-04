@@ -171,6 +171,12 @@ BEGIN
     RAISE EXCEPTION 'stale revision: PO is at %, form loaded at % — reload and retry',
       v_old.current_revision, p_expected_revision;
   END IF;
+  -- Old rows are never mutated when superseded — their metadata is
+  -- deactivated instead. No active metadata = a newer revision exists.
+  IF NOT EXISTS (SELECT 1 FROM po_metadata WHERE po_id = p_old_po_id AND active) THEN
+    RAISE EXCEPTION 'stale revision: a newer revision of PO % already exists — reload and retry',
+      v_old.po_number;
+  END IF;
 
   v_contact_id := po__ensure_contact(
     NULLIF(p_header->>'delivery_contact_id', '')::uuid,
@@ -226,6 +232,10 @@ BEGIN
   IF v_old.current_revision IS DISTINCT FROM p_expected_revision THEN
     RAISE EXCEPTION 'stale revision: PO is at %, form loaded at % — reload and retry',
       v_old.current_revision, p_expected_revision;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM po_metadata WHERE po_id = p_po_id AND active) THEN
+    RAISE EXCEPTION 'stale revision: a newer revision of PO % already exists — reload and retry',
+      v_old.po_number;
   END IF;
 
   UPDATE purchase_orders SET

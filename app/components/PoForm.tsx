@@ -150,6 +150,7 @@ export function PoForm({ mode, options, initial }: PoFormProps) {
       if (!result.ok || !result.poId) {
         setError(result.error ?? "Save failed.");
         setSubmitting(false);
+        window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
       // Full navigation — the Next router would re-prepend basePath.
@@ -359,7 +360,7 @@ export function PoForm({ mode, options, initial }: PoFormProps) {
                   <tr key={idx} className="border-b border-zinc-100 align-top last:border-0">
                     <td className="px-3 py-2">
                       <textarea
-                        className={`${inputCls} min-h-[2.25rem]`}
+                        className={`${inputCls} min-h-9`}
                         rows={1}
                         value={item.description}
                         onChange={(e) => setItem(idx, { description: e.target.value })}
@@ -422,6 +423,12 @@ export function PoForm({ mode, options, initial }: PoFormProps) {
           </p>
         )}
       </div>
+
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+          {error}
+        </div>
+      )}
 
       <div className="flex items-center gap-3">
         <button
