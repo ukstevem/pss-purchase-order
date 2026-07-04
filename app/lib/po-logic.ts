@@ -162,6 +162,19 @@ export function orderProjectOptions(projects: string[]): string[] {
   return [...sticky, ...rest];
 }
 
+/** Same ordering for project+item rows: sticky/descending projects, item_seq ascending within. */
+export function orderProjectItemRows<T extends { projectnumber: string; item_seq: number }>(
+  rows: T[]
+): T[] {
+  const projects = orderProjectOptions([...new Set(rows.map((r) => r.projectnumber))]);
+  const rank = new Map(projects.map((p, i) => [p, i]));
+  return [...rows].sort(
+    (a, b) =>
+      (rank.get(a.projectnumber) ?? 0) - (rank.get(b.projectnumber) ?? 0) ||
+      a.item_seq - b.item_seq
+  );
+}
+
 // --- Status / revision state machine (legacy utils/revision.py,
 // utils/status_utils.py, and routes.py edit_po inline helpers) ---
 

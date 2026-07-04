@@ -1,6 +1,6 @@
 import "server-only";
 import { getSupabaseAdmin } from "./supabase-admin";
-import { poDeliveryStatus, type Row } from "./po-logic";
+import { orderProjectItemRows, poDeliveryStatus, type Row } from "./po-logic";
 
 // Data layer mirroring the legacy app/supabase_client.py fetchers one-to-one.
 // Legacy line references point into C:\Dev\PSS\purchase_order (read-only
@@ -184,17 +184,19 @@ export interface ProjectItemOption {
   line_desc: string | null;
 }
 
-/** Create/edit form combo source (legacy routes.py:376-384). */
+/**
+ * Create/edit form combo source (legacy routes.py:376-384), ordered per the
+ * house rule (9bq.30): 0005/0006 sticky, then projects high→low, item_seq
+ * ascending within each project.
+ */
 export async function fetchProjectItemOptions(): Promise<ProjectItemOption[]> {
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
     .from("project_register_items")
     .select("projectnumber,item_seq,line_desc")
-    .order("projectnumber", { ascending: true })
-    .order("item_seq", { ascending: true })
     .limit(10000);
   if (error) throw new Error(`project_register_items failed: ${error.message}`);
-  return (data ?? []) as ProjectItemOption[];
+  return orderProjectItemRows((data ?? []) as ProjectItemOption[]);
 }
 
 /** Legacy suppliers_as_objects — id + name (no type filter, parity). */
