@@ -1,12 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { SearchSelect } from "@/components/SearchSelect";
 
 export interface SelectFilter {
   name: string;
   value: string;
   options: { value: string; label: string }[];
   allLabel: string;
+  /** Render as a substring type-ahead instead of a plain select (9bq.12). */
+  searchable?: boolean;
 }
 
 interface FilterBarProps {
@@ -40,21 +43,31 @@ export function FilterBar({ route, selects, dates, preserve }: FilterBarProps) {
 
   return (
     <div className="mb-4 flex flex-wrap items-end gap-3">
-      {selects.map((s) => (
-        <select
-          key={s.name}
-          value={s.value}
-          onChange={(e) => navigate({ [s.name]: e.target.value })}
-          className="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm"
-        >
-          <option value="">{s.allLabel}</option>
-          {s.options.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      ))}
+      {selects.map((s) =>
+        s.searchable ? (
+          <SearchSelect
+            key={s.name}
+            value={s.value}
+            options={s.options.map((o) => o.value)}
+            placeholder={s.allLabel}
+            onSelect={(v) => navigate({ [s.name]: v })}
+          />
+        ) : (
+          <select
+            key={s.name}
+            value={s.value}
+            onChange={(e) => navigate({ [s.name]: e.target.value })}
+            className="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm"
+          >
+            <option value="">{s.allLabel}</option>
+            {s.options.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        )
+      )}
       {dates && (
         <>
           <label className="text-sm text-zinc-600">

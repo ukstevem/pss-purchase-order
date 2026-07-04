@@ -72,6 +72,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
             value: selectedSupplier,
             allLabel: "All suppliers",
             options: supplierOptions.map((s) => ({ value: s, label: s })),
+            searchable: true,
           },
         ]}
       />

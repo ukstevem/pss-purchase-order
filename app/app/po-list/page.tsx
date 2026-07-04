@@ -80,6 +80,7 @@ export default async function PoListPage({ searchParams }: { searchParams: Promi
             value: selectedSupplier,
             allLabel: "All suppliers",
             options: suppliers.map((s) => ({ value: s, label: s })),
+            searchable: true,
           },
         ]}
         dates={{ from: dateFrom, to: dateTo }}
