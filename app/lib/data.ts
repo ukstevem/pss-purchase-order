@@ -21,15 +21,29 @@ export interface ProjectPoSummary {
  */
 export async function fetchProjectPoSummary(): Promise<ProjectPoSummary[]> {
   const sb = getSupabaseAdmin();
-  const [projRes, poRes] = await Promise.all([
-    sb.from("project_register").select("projectnumber").limit(10000),
-    sb.from("active_po_list").select("project_id,status"),
-  ]);
+  const projRes = await sb.from("project_register").select("projectnumber").limit(10000);
   if (projRes.error) throw new Error(`project_register failed: ${projRes.error.message}`);
-  if (poRes.error) throw new Error(`active_po_list summary failed: ${poRes.error.message}`);
+
+  // Offset-loop past PostgREST's 1000-row cap (bead 9bq.9 — unpaginated,
+  // the aggregation silently truncated and undercounted projects).
+  const pageSize = 1000;
+  let offset = 0;
+  const poRows: Row[] = [];
+  for (;;) {
+    const { data, error } = await sb
+      .from("active_po_list")
+      .select("project_id,status")
+      .order("po_number", { ascending: true })
+      .range(offset, offset + pageSize - 1);
+    if (error) throw new Error(`active_po_list summary failed: ${error.message}`);
+    const batch = (data ?? []) as Row[];
+    poRows.push(...batch);
+    if (batch.length < pageSize) break;
+    offset += pageSize;
+  }
 
   const counts = new Map<string, { draft: number; active: number }>();
-  for (const row of (poRes.data ?? []) as Row[]) {
+  for (const row of poRows) {
     const pn = String(row.project_id ?? "").trim();
     if (!pn) continue;
     const c = counts.get(pn) ?? { draft: 0, active: 0 };
