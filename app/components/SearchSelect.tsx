@@ -10,6 +10,8 @@ interface SearchSelectProps {
   placeholder: string;
   /** Called with the chosen option's value, or "" to clear. */
   onSelect: (value: string) => void;
+  /** Width utility for the input (default w-56; pass w-full for forms). */
+  className?: string;
 }
 
 function normalizeOptions(options: SearchOption[]): { value: string; label: string }[] {
@@ -32,7 +34,7 @@ function normalize(s: string): string {
  * applies the exact value; typing alone never navigates. Enter picks
  * the first match, Escape reverts, × clears.
  */
-export function SearchSelect({ value, options, placeholder, onSelect }: SearchSelectProps) {
+export function SearchSelect({ value, options, placeholder, onSelect, className = "w-56" }: SearchSelectProps) {
   const opts = normalizeOptions(options);
   const labelFor = (v: string) => opts.find((o) => o.value === v)?.label ?? v;
 
@@ -91,7 +93,7 @@ export function SearchSelect({ value, options, placeholder, onSelect }: SearchSe
             setText(value ? labelFor(value) : "");
           }
         }}
-        className="w-56 rounded-md border border-zinc-300 bg-white px-3 py-1.5 pr-7 text-sm"
+        className={`${className} rounded-md border border-zinc-300 bg-white px-3 py-1.5 pr-7 text-sm`}
       />
       {value && (
         <button
@@ -104,7 +106,7 @@ export function SearchSelect({ value, options, placeholder, onSelect }: SearchSe
         </button>
       )}
       {open && matches.length > 0 && (
-        <ul className="absolute z-20 mt-1 max-h-64 w-72 overflow-y-auto rounded-md border border-zinc-200 bg-white shadow-lg">
+        <ul className="absolute z-20 mt-1 max-h-64 min-w-72 w-full overflow-y-auto rounded-md border border-zinc-200 bg-white shadow-lg">
           {matches.map((o) => (
             <li key={o.value}>
               <button

@@ -172,7 +172,7 @@ export function PoForm({ mode, options, initial }: PoFormProps) {
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="space-y-4">
         <div>
           <label className={labelCls}>Project / Item *</label>
           <SearchSelect
@@ -180,6 +180,7 @@ export function PoForm({ mode, options, initial }: PoFormProps) {
             options={projectOptions}
             placeholder="Select project / item…"
             onSelect={setProjectCombo}
+            className="w-full"
           />
         </div>
         <div>
@@ -197,12 +198,10 @@ export function PoForm({ mode, options, initial }: PoFormProps) {
               options={supplierOptions}
               placeholder="Select supplier…"
               onSelect={setSupplierId}
+              className="w-full"
             />
           )}
         </div>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className={labelCls}>Delivery Address</label>
           <select
@@ -300,34 +299,6 @@ export function PoForm({ mode, options, initial }: PoFormProps) {
           </select>
         </div>
       </div>
-
-      {mode === "edit" && (
-        <div className="grid gap-4 sm:grid-cols-4">
-          <div>
-            <label className={labelCls}>Status</label>
-            <select className={inputCls} value={status} onChange={(e) => setStatus(e.target.value)}>
-              {allowedNextStatuses(currentStatus).map((s) => (
-                <option key={s} value={s}>
-                  {s.charAt(0).toUpperCase() + s.slice(1)}
-                </option>
-              ))}
-            </select>
-          </div>
-          {showBump && (
-            <div>
-              <label className={labelCls}>Bump Revision</label>
-              <select
-                className={inputCls}
-                value={bump ? "1" : "0"}
-                onChange={(e) => setBump(e.target.value === "1")}
-              >
-                <option value="0">No — save in place</option>
-                <option value="1">Yes — new revision</option>
-              </select>
-            </div>
-          )}
-        </div>
-      )}
 
       <div>
         <div className="mb-2 flex items-center justify-between">
@@ -430,7 +401,45 @@ export function PoForm({ mode, options, initial }: PoFormProps) {
         </div>
       )}
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-wrap items-end gap-4">
+          {mode === "edit" && (
+            <>
+              <div>
+                <label className={labelCls}>Status</label>
+                <select
+                  className={`${inputCls} w-44`}
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                >
+                  {allowedNextStatuses(currentStatus).map((s) => (
+                    <option key={s} value={s}>
+                      {s.charAt(0).toUpperCase() + s.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {showBump && (
+                <div>
+                  <label className={labelCls}>Bump Revision</label>
+                  <select
+                    className={`${inputCls} w-44`}
+                    value={bump ? "1" : "0"}
+                    onChange={(e) => setBump(e.target.value === "1")}
+                  >
+                    <option value="0">No — save in place</option>
+                    <option value="1">Yes — new revision</option>
+                  </select>
+                </div>
+              )}
+              {initial && (
+                <span className="pb-1.5 text-sm text-zinc-500">
+                  {initial.poNumberDisplay} — currently {currentStatus} rev {initial.expectedRevision}
+                </span>
+              )}
+            </>
+          )}
+        </div>
         <button
           type="submit"
           disabled={submitting}
@@ -442,11 +451,6 @@ export function PoForm({ mode, options, initial }: PoFormProps) {
               ? "Create PO (draft rev a)"
               : "Save PO"}
         </button>
-        {mode === "edit" && initial && (
-          <span className="text-sm text-zinc-500">
-            {initial.poNumberDisplay} — currently {currentStatus} rev {initial.expectedRevision}
-          </span>
-        )}
       </div>
     </form>
   );
