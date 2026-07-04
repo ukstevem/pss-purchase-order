@@ -257,5 +257,10 @@ REVOKE ALL ON FUNCTION public.po_update_in_place(uuid, text, text, jsonb, jsonb,
 GRANT EXECUTE ON FUNCTION public.po_create(jsonb, jsonb, jsonb, jsonb) TO service_role;
 GRANT EXECUTE ON FUNCTION public.po_new_revision(uuid, text, text, text, timestamp, jsonb, jsonb, jsonb, jsonb) TO service_role;
 GRANT EXECUTE ON FUNCTION public.po_update_in_place(uuid, text, text, jsonb, jsonb, jsonb) TO service_role;
+-- The main functions are SECURITY INVOKER, so the caller also needs
+-- EXECUTE on the helpers they call.
+GRANT EXECUTE ON FUNCTION public.po__insert_items(uuid, jsonb) TO service_role;
+GRANT EXECUTE ON FUNCTION public.po__ensure_contact(uuid, jsonb) TO service_role;
+GRANT EXECUTE ON FUNCTION public.po__insert_metadata(uuid, jsonb) TO service_role;
 
 COMMIT;
