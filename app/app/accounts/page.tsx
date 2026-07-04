@@ -2,7 +2,7 @@ import { PageHeader, Alert, EmptyState } from "@platform/ui";
 import { FilterBar } from "@/components/FilterBar";
 import { fetchAccountsOverview } from "@/lib/data";
 import { formatPoNumber, accountingNumber } from "@/lib/format";
-import { accountsIsCompleted, type Row } from "@/lib/po-logic";
+import { accountsIsCompleted, orderProjectOptions, type Row } from "@/lib/po-logic";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +65,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
             name: "project",
             value: selectedProject,
             allLabel: "All projects",
-            options: projectOptions.map((p) => ({ value: p, label: p })),
+            options: orderProjectOptions(projectOptions).map((p) => ({ value: p, label: p })),
           },
           {
             name: "supplier",

@@ -1,13 +1,12 @@
 import Link from "next/link";
 import { PageHeader, Alert, EmptyState } from "@platform/ui";
 import { fetchProjectPoSummary, type ProjectPoSummary } from "@/lib/data";
-import { naturalCompare } from "@/lib/po-logic";
+import { naturalCompare, STICKY_PROJECTS } from "@/lib/po-logic";
 
 export const dynamic = "force-dynamic";
 
 // Dashboard (bead 9bq.8): projects from project_register, descending by
 // project number, with 0005/0006 pinned to the top of every page, paginated.
-const STICKY_PROJECTS = ["0005", "0006"];
 const PAGE_SIZE = 50;
 
 type Search = Record<string, string | string[] | undefined>;

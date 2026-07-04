@@ -130,6 +130,21 @@ export function sortPoLineItems<T extends Row>(items: T[]): T[] {
     .map((x) => x.item);
 }
 
+/** Projects pinned to the top of dashboards and pick-lists (Steve, 2026-07-04). */
+export const STICKY_PROJECTS = ["0005", "0006"];
+
+/**
+ * Project pick-list ordering (beads 9bq.8/9bq.11): 0005/0006 first, then
+ * the rest descending (highest project number first).
+ */
+export function orderProjectOptions(projects: string[]): string[] {
+  const sticky = STICKY_PROJECTS.filter((p) => projects.includes(p));
+  const rest = projects
+    .filter((p) => !STICKY_PROJECTS.includes(p))
+    .sort((a, b) => naturalCompare(b, a));
+  return [...sticky, ...rest];
+}
+
 /** Legacy accounts is_completed(row) (blueprints/accounts.py:40-48). */
 export function accountsIsCompleted(row: Row): boolean {
   const v = row.acc_complete;

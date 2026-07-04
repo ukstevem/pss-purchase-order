@@ -7,7 +7,7 @@ import {
   fetchSupplierOptions,
   normalizeSort,
 } from "@/lib/data";
-import type { Row } from "@/lib/po-logic";
+import { orderProjectOptions, type Row } from "@/lib/po-logic";
 
 export const dynamic = "force-dynamic";
 
@@ -73,7 +73,7 @@ export default async function PoListPage({ searchParams }: { searchParams: Promi
             name: "project",
             value: selectedProject,
             allLabel: "All projects",
-            options: projects.map((p) => ({ value: p, label: p })),
+            options: orderProjectOptions(projects).map((p) => ({ value: p, label: p })),
           },
           {
             name: "supplier",
