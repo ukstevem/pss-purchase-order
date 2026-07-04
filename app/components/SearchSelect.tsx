@@ -10,11 +10,21 @@ interface SearchSelectProps {
   onSelect: (value: string) => void;
 }
 
+/** Lowercase and collapse punctuation to spaces, so "c rob" ≈ "C. Rob…" (9bq.13). */
+function normalize(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /**
- * Type-ahead filter (bead 9bq.12): typing narrows options by
- * case-insensitive substring anywhere in the name — "rob" finds
- * "C Roberts". Selecting applies the exact value; typing alone never
- * navigates. Enter picks the first match, Escape reverts, × clears.
+ * Type-ahead filter (beads 9bq.12/9bq.13): every typed word must appear
+ * somewhere in the punctuation-stripped name — "c rob", "c. rob" and
+ * "rob steel" all find "C. Roberts Steel Services Ltd.". Selecting
+ * applies the exact value; typing alone never navigates. Enter picks
+ * the first match, Escape reverts, × clears.
  */
 export function SearchSelect({ value, options, placeholder, onSelect }: SearchSelectProps) {
   const [text, setText] = useState(value);
@@ -23,9 +33,14 @@ export function SearchSelect({ value, options, placeholder, onSelect }: SearchSe
 
   useEffect(() => setText(value), [value]);
 
-  const needle = text.trim().toLowerCase();
+  const tokens = normalize(text).split(" ").filter(Boolean);
   const matches = (
-    needle ? options.filter((o) => o.toLowerCase().includes(needle)) : options
+    tokens.length
+      ? options.filter((o) => {
+          const n = normalize(o);
+          return tokens.every((t) => n.includes(t));
+        })
+      : options
   ).slice(0, 50);
 
   useEffect(() => {
