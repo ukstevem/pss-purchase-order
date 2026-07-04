@@ -71,12 +71,16 @@ export function ExpeditingTable({ rows, itemsByPo, writable = false }: Expeditin
     }
   }
 
-  /** Legacy JS parity: clamp received, auto-stamp/clear completed date. */
+  /**
+   * Auto-stamp/clear completed date on full receipt (legacy parity).
+   * Over-receipt is allowed in the new system (deliberate divergence,
+   * Steve 2026-07-04) — floor at 0 only.
+   */
   function saveReceived(poId: string, item: Row, raw: string) {
     const qty = Number(item.quantity ?? 0);
     let received = Number(raw);
     if (!Number.isFinite(received)) received = 0;
-    received = Math.min(Math.max(0, received), qty);
+    received = Math.max(0, received);
 
     const fields: Record<string, unknown> = { qty_received: received };
     const fullyReceived = qty > 0 && received >= qty;
@@ -171,7 +175,6 @@ export function ExpeditingTable({ rows, itemsByPo, writable = false }: Expeditin
                                         key={`r-${item.qty_received ?? 0}`}
                                         type="number"
                                         min={0}
-                                        max={Number(item.quantity ?? 0)}
                                         defaultValue={Number(item.qty_received ?? 0)}
                                         disabled={saving}
                                         onBlur={(e) => {

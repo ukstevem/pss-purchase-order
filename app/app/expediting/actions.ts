@@ -35,16 +35,11 @@ export async function updateLineItem(
   const sb = getSupabaseAdmin();
 
   if ("qty_received" in payload) {
-    const { data: itemRows, error: fetchError } = await sb
-      .from("po_line_items")
-      .select("id,quantity")
-      .eq("id", itemId)
-      .limit(1);
-    if (fetchError) return { ok: false, error: fetchError.message };
-    if (!itemRows?.length) return { ok: false, error: "Line item not found." };
-    const qty = Number(itemRows[0].quantity ?? 0);
+    // Deliberate divergence from legacy (Steve, 2026-07-04): over-receipt is
+    // allowed — floor at 0 only, no ceiling at quantity. Legacy keeps its
+    // clamp. Surfacing over-receipts is a follow-up bead.
     const received = Number(payload.qty_received ?? 0);
-    payload.qty_received = Math.min(Math.max(0, Number.isFinite(received) ? received : 0), qty);
+    payload.qty_received = Math.max(0, Number.isFinite(received) ? received : 0);
   }
 
   const { data, error } = await sb
