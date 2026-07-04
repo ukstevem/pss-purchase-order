@@ -1,0 +1,36 @@
+# Local test stack — builds the image on the host (amd64 Docker Desktop),
+# exposes the app on port 3017, and does NOT join platform_net. For Pi
+# deployment use docker-compose.app.yml instead.
+#
+# Usage (from the repo root; secrets stay in platform-portal, nothing copied):
+#   docker compose --env-file ../platform-portal/.env -f docker-compose.local.yml up --build -d
+#   open http://localhost:3017/purchase-order/
+#
+# NEXT_PUBLIC_APP_URL is pinned to localhost so the Azure OAuth redirect
+# returns here rather than to the gateway.
+
+services:
+  purchase-order:
+    build:
+      context: ./app
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        NEXT_PUBLIC_APP_URL: http://localhost:3017
+    container_name: purchase-order-local
+    restart: unless-stopped
+    environment:
+      PORT: 3017
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      NEXT_PUBLIC_APP_URL: http://localhost:3017
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY}
+    ports:
+      - "3017:3017"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3017/purchase-order/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
