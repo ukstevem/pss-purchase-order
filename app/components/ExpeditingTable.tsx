@@ -52,9 +52,9 @@ export function ExpeditingTable({
             <th className="px-4 py-2 font-medium">PO Number</th>
             <th className="px-4 py-2 font-medium">Project</th>
             <th className="px-4 py-2 font-medium">Supplier</th>
-            <th className="px-4 py-2 font-medium">Delivery</th>
-            <th className="px-4 py-2 font-medium">Revision</th>
-            <th className="px-4 py-2 font-medium">Date</th>
+            <th className="px-4 py-2 text-center font-medium">Delivery</th>
+            <th className="px-4 py-2 text-center font-medium">Revision</th>
+            <th className="px-4 py-2 text-center font-medium">Date</th>
           </tr>
         </thead>
         <tbody>
@@ -81,13 +81,13 @@ export function ExpeditingTable({
                   </td>
                   <td className="px-4 py-2">{po.projectnumber ?? po.project_id ?? ""}</td>
                   <td className="px-4 py-2">{po.supplier_name ?? ""}</td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2 text-center">
                     <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs ${FLAG_TONE[flag]}`}>
                       {FLAG_LABEL[flag]}
                     </span>
                   </td>
-                  <td className="px-4 py-2">{po.current_revision ?? ""}</td>
-                  <td className="px-4 py-2">{shortDate(po.last_release ?? po.updated_at ?? po.created)}</td>
+                  <td className="px-4 py-2 text-center">{po.current_revision ?? ""}</td>
+                  <td className="px-4 py-2 text-center">{shortDate(po.last_release ?? po.updated_at ?? po.created)}</td>
                 </tr>
                 {isOpen && (
                   <tr className="border-b border-zinc-100 bg-zinc-50/50">

@@ -4,10 +4,19 @@ import { useRouter } from "next/navigation";
 import { formatPoNumber, shortDate } from "@/lib/format";
 import type { Row } from "@/lib/po-logic";
 
+// Colour-coded pills (9bq.14 — improvement over legacy, which styled all
+// statuses identically).
+const STATUS_TONE: Record<string, string> = {
+  draft: "bg-zinc-200 text-zinc-800",
+  approved: "bg-blue-100 text-blue-800",
+  issued: "bg-green-100 text-green-800",
+  complete: "bg-zinc-300 text-zinc-900",
+  cancelled: "bg-red-50 text-red-700 line-through",
+};
+
 /**
  * PO list table with fully-clickable rows (legacy po_list.html data-href +
- * keyboard activation). Status tags carry status-specific classes for
- * future colouring; the legacy CSS styled all statuses identically.
+ * keyboard activation).
  */
 export function PoTable({ rows }: { rows: Row[] }) {
   const router = useRouter();
@@ -25,9 +34,9 @@ export function PoTable({ rows }: { rows: Row[] }) {
             <th className="px-4 py-2 font-medium">PO Number</th>
             <th className="px-4 py-2 font-medium">Project</th>
             <th className="px-4 py-2 font-medium">Supplier</th>
-            <th className="px-4 py-2 font-medium">Status</th>
-            <th className="px-4 py-2 font-medium">Revision</th>
-            <th className="px-4 py-2 font-medium">Date</th>
+            <th className="px-4 py-2 text-center font-medium">Status</th>
+            <th className="px-4 py-2 text-center font-medium">Revision</th>
+            <th className="px-4 py-2 text-center font-medium">Date</th>
           </tr>
         </thead>
         <tbody>
@@ -51,13 +60,15 @@ export function PoTable({ rows }: { rows: Row[] }) {
                 </td>
                 <td className="px-4 py-2">{po.projectnumber ?? po.project_id ?? ""}</td>
                 <td className="px-4 py-2">{po.supplier_name ?? ""}</td>
-                <td className="px-4 py-2">
-                  <span className={`inline-block rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs text-zinc-700 status-${st}`}>
+                <td className="px-4 py-2 text-center">
+                  <span
+                    className={`inline-block rounded-full px-2.5 py-0.5 text-xs ${STATUS_TONE[st] ?? "bg-zinc-100 text-zinc-700"}`}
+                  >
                     {st ? st.charAt(0).toUpperCase() + st.slice(1) : ""}
                   </span>
                 </td>
-                <td className="px-4 py-2">{po.current_revision ?? ""}</td>
-                <td className="px-4 py-2">{shortDate(po.last_release)}</td>
+                <td className="px-4 py-2 text-center">{po.current_revision ?? ""}</td>
+                <td className="px-4 py-2 text-center">{shortDate(po.last_release)}</td>
               </tr>
             );
           })}
