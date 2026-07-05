@@ -4,6 +4,7 @@ import { fetchPoDetail } from "@/lib/data";
 import { formatPoNumber, formatDate, accounting, qtyFormat } from "@/lib/format";
 import { sortPoLineItems, lineExpedStatus, type Row } from "@/lib/po-logic";
 import { writesEnabled } from "@/lib/writes";
+import { FilePdfButton } from "@/components/FilePdfButton";
 
 export const dynamic = "force-dynamic";
 
@@ -72,14 +73,32 @@ export default async function PoPreviewPage({ params }: { params: Promise<{ id: 
   return (
     <div className="p-8">
       <PageHeader title="Purchase Order" backHref="/po-list/" backLabel="Back to PO list">
-        {editable && (
-          <Link
-            href={`/po/${id}/edit/`}
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700"
+        <div className="flex items-center gap-2">
+          <a
+            href={`/purchase-order/po/${id}/pdf`}
+            target="_blank"
+            rel="noopener"
+            className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-100"
           >
-            ✏️ Edit PO
-          </Link>
-        )}
+            👁 Preview PDF
+          </a>
+          {status === "issued" && !po.issued_doc_id && writesEnabled() && (
+            <FilePdfButton poId={String(po.id)} />
+          )}
+          {po.issued_doc_number ? (
+            <span className="rounded-full bg-green-100 px-3 py-1 text-xs text-green-800">
+              Filed: {String(po.issued_doc_number)}
+            </span>
+          ) : null}
+          {editable && (
+            <Link
+              href={`/po/${id}/edit/`}
+              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700"
+            >
+              ✏️ Edit PO
+            </Link>
+          )}
+        </div>
       </PageHeader>
 
       <div className="max-w-4xl rounded-lg border border-zinc-200 bg-white p-6">

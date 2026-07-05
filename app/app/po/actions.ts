@@ -9,6 +9,9 @@ import {
   computeUpdatedRevision,
   shouldStampRelease,
 } from "@/lib/po-logic";
+import { fetchPoDetail } from "@/lib/data";
+import { buildPoPrintHtml } from "@/lib/pdf/po-print-html";
+import { fileHtmlDocument } from "@/lib/pdf/clients";
 
 // Create / edit PO write path (bead 9bq.26). Field handling mirrors legacy
 // create_po (routes.py:279) / edit_po (routes.py:423) + parse_po_form
@@ -161,6 +164,59 @@ export async function createPo(payload: PoFormPayload): Promise<SavePoResult> {
   return { ok: true, poId: String(data) };
 }
 
+export interface FilePoResult {
+  ok: boolean;
+  docNumber?: string;
+  alreadyFiled?: boolean;
+  error?: string;
+}
+
+/**
+ * Render + file the issued PO PDF via doc-service /api/file-html and stamp
+ * the registry reference on the revision row (bead 9bq.31). Skips when a
+ * doc is already stamped — the doc-service dedup never fires for rendered
+ * bytes, so the guard lives here.
+ */
+export async function filePoPdf(poId: string): Promise<FilePoResult> {
+  if (!writesEnabled()) return { ok: false, error: "Writes are disabled (PO_WRITES_ENABLED)." };
+
+  const sb = getSupabaseAdmin();
+  try {
+    const po = await fetchPoDetail(poId);
+    if (!po) return { ok: false, error: "PO not found." };
+    if (String(po.status ?? "").toLowerCase() !== "issued") {
+      return { ok: false, error: "Only issued POs are filed. Use Preview PDF for drafts." };
+    }
+    if (po.issued_doc_id) {
+      return { ok: true, alreadyFiled: true, docNumber: String(po.issued_doc_number ?? "") };
+    }
+
+    const doc = buildPoPrintHtml(po);
+    const filed = await fileHtmlDocument({
+      html: doc.html,
+      footerLeft: doc.footerLeft,
+      projectNumber: String(po.project_id ?? ""),
+      originalFileName: doc.fileName,
+    });
+
+    const { error } = await sb
+      .from("purchase_orders")
+      .update({ issued_doc_id: filed.id, issued_doc_number: filed.doc_number })
+      .eq("id", poId);
+    if (error) {
+      // Filed but not stamped — surface loudly; doc_number in the message
+      // lets it be reconciled by hand.
+      return {
+        ok: false,
+        error: `PDF filed as ${filed.doc_number} but stamping the PO failed: ${error.message}. Retry will re-file; reconcile manually.`,
+      };
+    }
+    return { ok: true, docNumber: filed.doc_number };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 export interface EditPoPayload extends PoFormPayload {
   poId: string;
   expectedRevision: string; // revision the form loaded with (stale guard)
@@ -239,6 +295,7 @@ export async function savePoEdit(payload: EditPoPayload): Promise<SavePoResult> 
         p_items: v.items,
       });
       if (error) return { ok: false, error: error.message };
+      await autoFileIfIssued(String(data), newStatus);
       return { ok: true, poId: String(data) };
     }
 
@@ -269,8 +326,22 @@ export async function savePoEdit(payload: EditPoPayload): Promise<SavePoResult> 
       p_manual_contact: v.manualContact,
     });
     if (error) return { ok: false, error: error.message };
+    await autoFileIfIssued(String(data), newStatus);
     return { ok: true, poId: String(data) };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
+ * Best-effort auto-filing when a save lands on issued (bead 9bq.31). A
+ * failure never fails the save — the PO preview shows a "File PDF" retry
+ * button whenever a PO is issued with no stamped document.
+ */
+async function autoFileIfIssued(poId: string, newStatus: string): Promise<void> {
+  if (newStatus !== "issued") return;
+  const filed = await filePoPdf(poId);
+  if (!filed.ok) {
+    console.error("[purchase-order] auto-filing after issue failed:", filed.error);
   }
 }

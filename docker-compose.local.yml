@@ -37,6 +37,13 @@ services:
       SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY}
       # Stage-2 write gate — runtime, set in local/.env for clone dev (9bq.24)
       PO_WRITES_ENABLED: ${PO_WRITES_ENABLED:-}
+      # PDF pipeline (9bq.31) — host.docker.internal reaches services on the
+      # dev machine (pdf-service container :8017; local doc-service instance)
+      PDF_SERVICE_URL: ${PDF_SERVICE_URL:-http://host.docker.internal:8017}
+      PDF_SERVICE_API_KEY: ${PDF_SERVICE_API_KEY:-localdev}
+      DOC_SERVICE_URL: ${DOC_SERVICE_URL:-}
+      DOC_SERVICE_API_KEY: ${DOC_SERVICE_API_KEY:-}
+      PO_ISO_DESCRIPTION_ID: ${PO_ISO_DESCRIPTION_ID:-53}
     ports:
       - "3017:3017"
     healthcheck:

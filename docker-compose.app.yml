@@ -24,6 +24,12 @@ services:
       # Stage-2 write gate — leave unset for read-only; set to "1" at
       # write-cutover (runtime flag, restart applies it; no rebuild)
       PO_WRITES_ENABLED: ${PO_WRITES_ENABLED:-}
+      # PDF pipeline (9bq.31): pss-pdf-service on the Orin + doc-service filing
+      PDF_SERVICE_URL: ${PDF_SERVICE_URL:-http://10.0.0.74:8017}
+      PDF_SERVICE_API_KEY: ${PDF_SERVICE_API_KEY:-}
+      DOC_SERVICE_URL: ${DOC_SERVICE_URL:-http://10.0.0.74:3000}
+      DOC_SERVICE_API_KEY: ${DOC_SERVICE_API_KEY:-}
+      PO_ISO_DESCRIPTION_ID: ${PO_ISO_DESCRIPTION_ID:-53}
     ports:
       - "3017:3017"
     healthcheck:
