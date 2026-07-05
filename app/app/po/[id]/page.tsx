@@ -75,7 +75,7 @@ export default async function PoPreviewPage({ params }: { params: Promise<{ id: 
       <PageHeader title="Purchase Order" backHref="/po-list/" backLabel="Back to PO list">
         <div className="flex items-center gap-2">
           <a
-            href={`/purchase-order/po/${id}/pdf`}
+            href={`/purchase-order/po/${id}/pdf/`}
             target="_blank"
             rel="noopener"
             className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-100"
