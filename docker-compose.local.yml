@@ -28,7 +28,18 @@ services:
         NEXT_PUBLIC_ALLOW_PASSWORD_AUTH: ${NEXT_PUBLIC_ALLOW_PASSWORD_AUTH:-}
     container_name: purchase-order-local
     restart: unless-stopped
+    # Bypass Docker's host-forwarded DNS — NetExtender's interception returns
+    # v6-first answers that musl resolves to unreachable addresses
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    # Custom dns drops Docker's magic name — pin it via the gateway instead
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
+      # Prefer A records — v6-first resolution breaks outbound fetch when
+      # the network has no v6 route (seen with NetExtender DNS interception)
+      NODE_OPTIONS: --dns-result-order=ipv4first
       PORT: 3017
       NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
