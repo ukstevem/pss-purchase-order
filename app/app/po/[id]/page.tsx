@@ -6,6 +6,9 @@ import { sortPoLineItems, lineExpedStatus, type Row } from "@/lib/po-logic";
 import { writesEnabled } from "@/lib/writes";
 import { FilePdfButton } from "@/components/FilePdfButton";
 import { IssuePoButton } from "@/components/IssuePoButton";
+import { EmailDraftButton } from "@/components/EmailDraftButton";
+import { emailDraftEnabled } from "@/lib/email/graph";
+import { shortDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -93,6 +96,16 @@ export default async function PoPreviewPage({ params }: { params: Promise<{ id: 
           {status === "issued" && !po.issued_doc_id && writesEnabled() && (
             <FilePdfButton poId={String(po.id)} />
           )}
+          {status === "issued" &&
+            po.issued_doc_id &&
+            !po.email_draft_at &&
+            writesEnabled() &&
+            emailDraftEnabled() && <EmailDraftButton poId={String(po.id)} />}
+          {po.email_draft_at ? (
+            <span className="rounded-full bg-blue-100 px-3 py-1 text-xs text-blue-800">
+              ✉ Drafted {shortDate(po.email_draft_at)}
+            </span>
+          ) : null}
           {po.issued_doc_number ? (
             filedUrl ? (
               <a

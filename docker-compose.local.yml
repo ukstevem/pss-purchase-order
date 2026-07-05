@@ -46,6 +46,13 @@ services:
       # Browser-reachable doc-service base for filed-document links (9bq.31)
       DOC_SERVICE_PUBLIC_URL: ${DOC_SERVICE_PUBLIC_URL:-}
       PO_ISO_DESCRIPTION_ID: ${PO_ISO_DESCRIPTION_ID:-53}
+      # Outlook drafts (9bq.7) — drafts only, never sent; OFF unless
+      # EMAIL_DRAFT_ON_PO=1 and MS_* creds provided
+      EMAIL_DRAFT_ON_PO: ${EMAIL_DRAFT_ON_PO:-}
+      MS_TENANT_ID: ${MS_TENANT_ID:-}
+      MS_CLIENT_ID: ${MS_CLIENT_ID:-}
+      MS_CLIENT_SECRET: ${MS_CLIENT_SECRET:-}
+      MS_OUTLOOK_MAILBOX: ${MS_OUTLOOK_MAILBOX:-}
     ports:
       - "3017:3017"
     healthcheck:

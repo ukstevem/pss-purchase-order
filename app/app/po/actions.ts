@@ -12,6 +12,12 @@ import {
 import { fetchPoDetail } from "@/lib/data";
 import { buildPoPrintHtml } from "@/lib/pdf/po-print-html";
 import { fileHtmlDocument } from "@/lib/pdf/clients";
+import {
+  createDraftWithAttachment,
+  buildSubjectAndBody,
+  emailDraftEnabled,
+} from "@/lib/email/graph";
+import { formatPoNumber } from "@/lib/format";
 
 // Create / edit PO write path (bead 9bq.26). Field handling mirrors legacy
 // create_po (routes.py:279) / edit_po (routes.py:423) + parse_po_form
@@ -211,8 +217,92 @@ export async function filePoPdf(poId: string): Promise<FilePoResult> {
         error: `PDF filed as ${filed.doc_number} but stamping the PO failed: ${error.message}. Retry will re-file; reconcile manually.`,
       };
     }
+
+    // Legacy issue flow created the Outlook draft alongside the PDF —
+    // best-effort here too; the preview's Email Draft button is the retry.
+    const draft = await createPoEmailDraft(poId);
+    if (!draft.ok && !draft.skipped) {
+      console.error("[purchase-order] auto email draft failed:", draft.error);
+    }
+
     return { ok: true, docNumber: filed.doc_number };
   } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export interface EmailDraftResult {
+  ok: boolean;
+  skipped?: string; // disabled/unconfigured — not an error for the auto path
+  webLink?: string;
+  error?: string;
+}
+
+/**
+ * Outlook draft with the FILED artifact attached (bead 9bq.7 — legacy
+ * try_create_po_draft parity: draft only, never sent; subject/body exact).
+ * Fail-closed single-flight: atomically claims email_draft_at before
+ * talking to Graph (legacy's file lock failed open — gcc.7).
+ */
+export async function createPoEmailDraft(poId: string): Promise<EmailDraftResult> {
+  if (!writesEnabled()) return { ok: false, error: "Writes are disabled (PO_WRITES_ENABLED)." };
+  if (!emailDraftEnabled()) return { ok: false, skipped: "EMAIL_DRAFT_ON_PO is not enabled." };
+  const mailbox = process.env.MS_OUTLOOK_MAILBOX;
+  if (!mailbox) return { ok: false, skipped: "MS_OUTLOOK_MAILBOX is not set." };
+
+  const sb = getSupabaseAdmin();
+  const po = await fetchPoDetail(poId);
+  if (!po) return { ok: false, error: "PO not found." };
+  if (String(po.status ?? "").toLowerCase() !== "issued" || !po.issued_doc_id) {
+    return { ok: false, error: "Drafts are created only for issued, filed POs." };
+  }
+  if (po.email_draft_at) return { ok: false, error: "A draft was already created for this revision." };
+
+  // Atomic claim — the single-flight guard.
+  const claimTs = new Date().toISOString().replace(/\.\d+Z$/, "");
+  const { data: claim, error: claimError } = await sb
+    .from("purchase_orders")
+    .update({ email_draft_at: claimTs })
+    .eq("id", poId)
+    .is("email_draft_at", null)
+    .select("id");
+  if (claimError) return { ok: false, error: claimError.message };
+  if (!claim?.length) return { ok: false, error: "A draft was already created for this revision." };
+
+  try {
+    const { data: docRows, error: docError } = await sb
+      .from("document_incoming_scan")
+      .select("filed_path")
+      .eq("id", po.issued_doc_id)
+      .limit(1);
+    if (docError || !docRows?.[0]?.filed_path) {
+      throw new Error(docError?.message ?? "Filed document not found in the registry.");
+    }
+    const base = process.env.DOC_SERVICE_URL;
+    if (!base) throw new Error("DOC_SERVICE_URL not configured");
+    const pdfRes = await fetch(`${base.replace(/\/$/, "")}${docRows[0].filed_path}`, {
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!pdfRes.ok) throw new Error(`Fetching filed PDF failed (${pdfRes.status})`);
+    const attachmentBase64 = Buffer.from(await pdfRes.arrayBuffer()).toString("base64");
+
+    const poNumStr = formatPoNumber(po.po_number);
+    const project = String(po.projectnumber ?? po.project_id ?? "UNKNOWN-PROJECT");
+    const { subject, bodyText } = buildSubjectAndBody(project, poNumStr);
+    const supplierEmail = String((po.suppliers as Record<string, unknown>)?.email ?? "").trim();
+
+    const draft = await createDraftWithAttachment({
+      mailbox,
+      subject,
+      bodyText,
+      toRecipients: supplierEmail ? [supplierEmail] : [],
+      attachmentName: `PO ${poNumStr} rev ${po.current_revision ?? ""}.pdf`,
+      attachmentBase64,
+    });
+    return { ok: true, webLink: draft.webLink };
+  } catch (e) {
+    // Release the claim so a retry is possible — fail closed, not stuck.
+    await sb.from("purchase_orders").update({ email_draft_at: null }).eq("id", poId);
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 }
