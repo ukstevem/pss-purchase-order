@@ -19,7 +19,7 @@ export function EmailDraftButton({ poId }: { poId: string }) {
         setError(result.error ?? result.skipped ?? "Draft creation failed.");
         return;
       }
-      if (result.webLink) window.open(result.webLink, "_blank", "noopener");
+      // No webLink open — drafts are reviewed in desktop Outlook (Steve).
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
