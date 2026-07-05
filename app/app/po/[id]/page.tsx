@@ -5,6 +5,7 @@ import { formatPoNumber, formatDate, accounting, qtyFormat } from "@/lib/format"
 import { sortPoLineItems, lineExpedStatus, type Row } from "@/lib/po-logic";
 import { writesEnabled } from "@/lib/writes";
 import { FilePdfButton } from "@/components/FilePdfButton";
+import { IssuePoButton } from "@/components/IssuePoButton";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +84,12 @@ export default async function PoPreviewPage({ params }: { params: Promise<{ id: 
           >
             👁 Preview PDF
           </a>
+          {(status === "draft" || status === "approved") && writesEnabled() && (
+            <IssuePoButton
+              poId={String(po.id)}
+              poLabel={`PO ${formatPoNumber(po.po_number)} rev ${po.current_revision ?? ""}`}
+            />
+          )}
           {status === "issued" && !po.issued_doc_id && writesEnabled() && (
             <FilePdfButton poId={String(po.id)} />
           )}

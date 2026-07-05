@@ -224,6 +224,45 @@ export interface EditPoPayload extends PoFormPayload {
   bumpRevision: boolean;
 }
 
+/**
+ * One-click issue from the preview page (bead 9bq.31 — legacy parity: the
+ * old system had an explicit Issue PO action). Re-saves the PO exactly as
+ * it stands with status=issued, running the normal revision matrix
+ * (approved: in-place; draft: new snapshot coerced to rev 1) and the
+ * auto-file hook.
+ */
+export async function issuePo(poId: string): Promise<SavePoResult> {
+  if (!writesEnabled()) return { ok: false, error: "Writes are disabled (PO_WRITES_ENABLED)." };
+  const po = await fetchPoDetail(poId);
+  if (!po) return { ok: false, error: "PO not found." };
+
+  const mdList = (po.po_metadata ?? []) as Record<string, unknown>[];
+  const md = (mdList[0] ?? {}) as Record<string, unknown>;
+  const items = ((po.line_items ?? []) as Record<string, unknown>[]).map((item) => ({
+    description: String(item.description ?? ""),
+    quantity: Number(item.quantity ?? 0),
+    unit: String(item.unit ?? ""),
+    unitPrice: Number(item.unit_price ?? 0),
+  }));
+
+  return savePoEdit({
+    poId,
+    expectedRevision: String(po.current_revision ?? "a"),
+    status: "issued",
+    bumpRevision: false,
+    projectId: String(po.project_id ?? ""),
+    itemSeq: String(po.item_seq ?? ""),
+    supplierId: String(po.supplier_id ?? ""),
+    deliveryAddressId: String(po.delivery_address?.id ?? po.delivery_contact?.address_id ?? "") || undefined,
+    deliveryContactId: String(po.delivery_contact_id ?? "") || undefined,
+    deliveryTerms: String(md.delivery_terms ?? ""),
+    deliveryDate: String(md.delivery_date ?? "").slice(0, 10),
+    supplierRef: String(md.supplier_reference_number ?? ""),
+    testCertRequired: Boolean(md.test_certificates_required),
+    items,
+  });
+}
+
 export async function savePoEdit(payload: EditPoPayload): Promise<SavePoResult> {
   if (!writesEnabled()) return { ok: false, error: "Writes are disabled (PO_WRITES_ENABLED)." };
 
