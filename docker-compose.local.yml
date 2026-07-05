@@ -43,6 +43,8 @@ services:
       PDF_SERVICE_API_KEY: ${PDF_SERVICE_API_KEY:-localdev}
       DOC_SERVICE_URL: ${DOC_SERVICE_URL:-}
       DOC_SERVICE_API_KEY: ${DOC_SERVICE_API_KEY:-}
+      # Browser-reachable doc-service base for filed-document links (9bq.31)
+      DOC_SERVICE_PUBLIC_URL: ${DOC_SERVICE_PUBLIC_URL:-}
       PO_ISO_DESCRIPTION_ID: ${PO_ISO_DESCRIPTION_ID:-53}
     ports:
       - "3017:3017"

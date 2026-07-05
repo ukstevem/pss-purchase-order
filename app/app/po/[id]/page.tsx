@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { PageHeader, Alert } from "@platform/ui";
-import { fetchPoDetail } from "@/lib/data";
+import { fetchPoDetail, fetchFiledDocUrl } from "@/lib/data";
 import { formatPoNumber, formatDate, accounting, qtyFormat } from "@/lib/format";
 import { sortPoLineItems, lineExpedStatus, type Row } from "@/lib/po-logic";
 import { writesEnabled } from "@/lib/writes";
@@ -69,6 +69,7 @@ export default async function PoPreviewPage({ params }: { params: Promise<{ id: 
 
   const status = String(po.status ?? "").toLowerCase();
   const editable = writesEnabled() && status !== "complete" && status !== "cancelled";
+  const filedUrl = po.issued_doc_id ? await fetchFiledDocUrl(String(po.issued_doc_id)) : null;
 
   return (
     <div className="p-8">
@@ -86,9 +87,21 @@ export default async function PoPreviewPage({ params }: { params: Promise<{ id: 
             <FilePdfButton poId={String(po.id)} />
           )}
           {po.issued_doc_number ? (
-            <span className="rounded-full bg-green-100 px-3 py-1 text-xs text-green-800">
-              Filed: {String(po.issued_doc_number)}
-            </span>
+            filedUrl ? (
+              <a
+                href={filedUrl}
+                target="_blank"
+                rel="noopener"
+                className="rounded-full bg-green-100 px-3 py-1 text-xs text-green-800 underline-offset-2 hover:underline"
+                title="Open the filed document"
+              >
+                Filed: {String(po.issued_doc_number)} ↗
+              </a>
+            ) : (
+              <span className="rounded-full bg-green-100 px-3 py-1 text-xs text-green-800">
+                Filed: {String(po.issued_doc_number)}
+              </span>
+            )
           ) : null}
           {editable && (
             <Link

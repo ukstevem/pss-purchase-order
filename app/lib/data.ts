@@ -234,6 +234,24 @@ export async function fetchDeliveryContacts(): Promise<Row[]> {
   return (data ?? []) as Row[];
 }
 
+/**
+ * Browser-openable URL of a filed document (bead 9bq.31). The registry row
+ * carries filed_path; the public base differs from the server-side
+ * DOC_SERVICE_URL when the app runs in a container.
+ */
+export async function fetchFiledDocUrl(docId: string): Promise<string | null> {
+  const base = process.env.DOC_SERVICE_PUBLIC_URL ?? process.env.DOC_SERVICE_URL;
+  if (!base) return null;
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("document_incoming_scan")
+    .select("filed_path")
+    .eq("id", docId)
+    .limit(1);
+  if (error || !data?.[0]?.filed_path) return null;
+  return `${base.replace(/\/$/, "")}${data[0].filed_path}`;
+}
+
 export interface PoDetail extends Row {
   suppliers?: Row | null;
   po_metadata?: Row[] | null;
