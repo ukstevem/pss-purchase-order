@@ -57,7 +57,10 @@ export async function fileHtmlDocument(opts: FileHtmlOptions): Promise<FileHtmlR
       footer: { left: opts.footerLeft },
       page: { format: "A4", orientation: "portrait" },
       iso_description_id: isoDescriptionId,
-      project_number: opts.projectNumber,
+      // Doc-service requires a 5-digit reference and rejects 4-digit
+      // (Steve, 2026-07-05): "0005" files as "00005". Our own data keeps
+      // the unpadded form everywhere else.
+      project_number: opts.projectNumber.padStart(5, "0"),
       original_file_name: opts.originalFileName,
     }),
     signal: AbortSignal.timeout(60_000),

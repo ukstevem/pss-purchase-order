@@ -36,7 +36,7 @@ table.certs td { border: 0.2mm solid rgba(6,27,55,.25); padding: 1mm; }
 /* position:fixed repeats on every printed page in Chromium */
 .watermark { position: fixed; top: 45%; left: 0; width: 100%; text-align: center;
   transform: rotate(-30deg); font-size: 34pt; font-weight: 700; letter-spacing: 2pt;
-  color: rgba(180, 30, 30, 0.13); pointer-events: none; z-index: 999; }
+  color: rgba(180, 30, 30, 0.20); pointer-events: none; z-index: 999; }
 `;
 
 function esc(v: unknown): string {
