@@ -33,6 +33,10 @@ table.certs { width: 100%; border-collapse: collapse; font-size: 7.5pt; }
 table.certs th { border: 0.2mm solid rgba(6,27,55,.4); background: rgb(233,242,249); color: rgb(6,27,55); padding: 1mm; text-align: left; }
 table.certs td { border: 0.2mm solid rgba(6,27,55,.25); padding: 1mm; }
 .certs-title { font-size: 9pt; font-weight: 600; margin: 0 0 1.5mm; color: rgb(6,27,55); }
+/* position:fixed repeats on every printed page in Chromium */
+.watermark { position: fixed; top: 45%; left: 0; width: 100%; text-align: center;
+  transform: rotate(-30deg); font-size: 34pt; font-weight: 700; letter-spacing: 2pt;
+  color: rgba(180, 30, 30, 0.13); pointer-events: none; z-index: 999; }
 `;
 
 function esc(v: unknown): string {
@@ -57,7 +61,12 @@ export interface PoPrintResult {
   fileName: string; // human-facing, e.g. "PO 007062 rev 1.pdf"
 }
 
-export function buildPoPrintHtml(po: PoDetail): PoPrintResult {
+export interface PoPrintOptions {
+  /** Diagonal per-page watermark; previews always set this, filing never does. */
+  watermark?: string;
+}
+
+export function buildPoPrintHtml(po: PoDetail, options: PoPrintOptions = {}): PoPrintResult {
   const mdList = (po.po_metadata ?? []) as Row[];
   const md: Row = mdList.length > 0 ? mdList[0] : {};
   const sup: Row = (po.suppliers as Row) ?? {};
@@ -104,8 +113,12 @@ export function buildPoPrintHtml(po: PoDetail): PoPrintResult {
     .map((c) => `<tr><td>${esc(c.product)}</td><td>${esc(c.standard)}</td><td>${esc(c.documentation)}</td></tr>`)
     .join("");
 
+  const watermark = options.watermark
+    ? `<div class="watermark">${esc(options.watermark)}</div>`
+    : "";
+
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>${CSS}</style></head><body>
-<div class="head">
+${watermark}<div class="head">
   <div><img src="${PSS_LOGO_DATA_URI}" alt="PSS"></div>
   <div class="meta">
     <h1>Purchase Order</h1>

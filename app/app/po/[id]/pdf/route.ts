@@ -14,7 +14,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     const po = await fetchPoDetail(id);
     if (!po) return NextResponse.json({ error: "PO not found" }, { status: 404 });
 
-    const doc = buildPoPrintHtml(po);
+    // Every preview is watermarked; only the filed document is clean.
+    const doc = buildPoPrintHtml(po, { watermark: "PREVIEW ONLY — NOT A VALID PO" });
     const pdf = await renderPreviewPdf(doc);
     return new NextResponse(new Uint8Array(pdf), {
       status: 200,
