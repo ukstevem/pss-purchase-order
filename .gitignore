@@ -30,3 +30,6 @@ output/
 
 # TS build cache
 *.tsbuildinfo
+
+# Local-only secrets/config staging
+local/
