@@ -51,7 +51,6 @@ services:
       retries: 3
       start_period: 20s
 
-networks:
-  default:
-    name: platform_net
-    external: true
+# No external network: the gateway reaches standalone apps via host-IP:port
+# (production.conf `set $purchase_order_backend http://10.0.0.75:3017`), and
+# platform_net does not exist on the Pi despite the template folklore.
