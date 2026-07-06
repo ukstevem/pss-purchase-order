@@ -3,6 +3,13 @@ services:
     image: ghcr.io/ukstevem/pss-purchase-order:${IMAGE_TAG:-latest}
     container_name: purchase-order
     restart: unless-stopped
+    # Public DNS: the LAN resolver drops/starves AAAA queries and musl waits
+    # for both A+AAAA in parallel -> multi-second stalls per lookup (same
+    # pathology as dev, see docker-compose.local.yml). All service URLs here
+    # are raw IPs; only the Supabase cloud hostname needs resolving.
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     # Portainer Stack > Environment variables (or shell `export` for
     # local docker compose). Required at runtime:
     #   NEXT_PUBLIC_SUPABASE_URL
