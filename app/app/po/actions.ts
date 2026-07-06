@@ -439,6 +439,24 @@ export async function savePoEdit(payload: EditPoPayload): Promise<SavePoResult> 
       targetRev = coerceRevOnLeavingDraft(targetRev, currentStatus, newStatus);
     }
 
+    // Same revision = a second (po_number, revision) row, which
+    // ux_po_number_revision rightly forbids. Legacy attempted the insert
+    // anyway and always failed (latent bug — issued→cancelled/complete was
+    // impossible there). Status-only transitions update in place instead.
+    if (targetRev === currentRev) {
+      const { data, error } = await sb.rpc("po_update_in_place", {
+        p_po_id: payload.poId,
+        p_expected_revision: currentRev,
+        p_status: newStatus,
+        p_header: v.header,
+        p_metadata: v.metadata,
+        p_items: v.items,
+      });
+      if (error) return { ok: false, error: error.message };
+      await autoFileIfIssued(String(data), newStatus);
+      return { ok: true, poId: String(data) };
+    }
+
     const lastRelease = shouldStampRelease(currentRev, targetRev)
       ? new Date().toISOString().replace(/\.\d+Z$/, "") // timestamp-without-tz, UTC (legacy utcnow)
       : null; // function carries the old value forward
