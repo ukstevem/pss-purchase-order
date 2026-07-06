@@ -58,6 +58,20 @@ interface PoFormProps {
 const inputCls = "w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm";
 const labelCls = "mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-500";
 
+/**
+ * UUIDv4 without crypto.randomUUID — that API exists only in secure
+ * contexts (HTTPS/localhost) and the gateway serves plain HTTP, which
+ * crashed the form on 10.0.0.75. getRandomValues works everywhere.
+ */
+function uuid4(): string {
+  const b = new Uint8Array(16);
+  crypto.getRandomValues(b);
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = Array.from(b, (x) => x.toString(16).padStart(2, "0"));
+  return `${h.slice(0, 4).join("")}-${h.slice(4, 6).join("")}-${h.slice(6, 8).join("")}-${h.slice(8, 10).join("")}-${h.slice(10).join("")}`;
+}
+
 export function PoForm({ mode, options, initial }: PoFormProps) {
   const [projectCombo, setProjectCombo] = useState(
     initial ? `${initial.projectId}:${initial.itemSeq}` : ""
@@ -81,7 +95,7 @@ export function PoForm({ mode, options, initial }: PoFormProps) {
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
+  const [idempotencyKey] = useState(() => uuid4());
 
   const projectOptions = useMemo(
     () =>
