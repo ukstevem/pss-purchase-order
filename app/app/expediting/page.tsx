@@ -62,6 +62,9 @@ export default async function ExpeditingPage({ searchParams }: { searchParams: P
           project: selectedProject || undefined,
           supplier: selectedSupplier || undefined,
           status: selectedStatus || undefined,
+          // Only expeditable states by default (gcc.12): cancelled/complete/
+          // draft POs have nothing to chase. Explicit status filter overrides.
+          statusIn: ["approved", "issued"],
           dateFrom: dateFrom || undefined,
           dateTo: dateTo || undefined,
           sort,

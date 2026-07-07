@@ -114,7 +114,12 @@ export function ExpeditingTable({ rows, itemsByPo, writable = false }: Expeditin
           {rows.map((po, i) => {
             const poId = String(po.id ?? po.purchase_order_id ?? i);
             const poItems = items[poId] ?? [];
-            const flag = poDeliveryStatus(poItems, today);
+            const poStatus = String(po.status ?? "").toLowerCase();
+            // Delivery states are meaningless for cancelled/draft POs (gcc.12)
+            const flag =
+              poStatus === "cancelled" || poStatus === "draft"
+                ? "unknown"
+                : poDeliveryStatus(poItems, today);
             const isOpen = openPo === poId;
             return (
               <Fragment key={poId}>

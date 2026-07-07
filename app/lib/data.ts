@@ -72,6 +72,8 @@ export interface PoListFilters {
   project?: string;
   supplier?: string;
   status?: string;
+  /** Default status scope applied only when `status` is not set (gcc.12). */
+  statusIn?: string[];
   dateFrom?: string;
   dateTo?: string;
   sort?: string;
@@ -88,13 +90,14 @@ export function normalizeSort(sort?: string, dir?: string): { sort: string; dir:
 // Filter application shared by the list fetchers — semantics mirror legacy
 // fetch_active_pos_from_view (supabase_client.py:546).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function applyPoFilters<T extends { ilike: any; eq: any; gte: any; lt: any }>(
+function applyPoFilters<T extends { ilike: any; eq: any; gte: any; lt: any; in: any }>(
   q: T,
   f: PoListFilters
 ): T {
   if (f.project) q = q.ilike("project_id", `%${f.project}%`);
   if (f.supplier) q = q.eq("supplier_name", f.supplier);
   if (f.status) q = q.eq("status", f.status);
+  else if (f.statusIn?.length) q = q.in("status", f.statusIn);
   if (f.dateFrom) q = q.gte("updated_at", `${f.dateFrom}T00:00:00`);
   if (f.dateTo) q = q.lt("updated_at", `${f.dateTo}T00:00:00`);
   return q;
