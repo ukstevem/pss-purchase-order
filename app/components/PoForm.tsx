@@ -179,7 +179,18 @@ export function PoForm({ mode, options, initial }: PoFormProps) {
   const showBump = mode === "edit" && ["approved", "issued"].includes(currentStatus);
 
   return (
-    <form onSubmit={submit} className="max-w-4xl space-y-6">
+    <form
+      onSubmit={submit}
+      onKeyDown={(e) => {
+        // Swallow implicit Enter-submission from single-line inputs (y6c):
+        // a stray Enter in qty/unit/price must not create a half-finished
+        // PO. Textareas keep their newlines; the submit button still works.
+        if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") {
+          e.preventDefault();
+        }
+      }}
+      className="max-w-4xl space-y-6"
+    >
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
           {error}
