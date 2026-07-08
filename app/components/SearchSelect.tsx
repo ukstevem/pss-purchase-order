@@ -12,6 +12,12 @@ interface SearchSelectProps {
   onSelect: (value: string) => void;
   /** Width utility for the input (default w-56; pass w-full for forms). */
   className?: string;
+  /**
+   * When set, the dropdown footer offers "+ Add '<typed text>'…" and calls
+   * this with the current text (bead 9bq.17 — add supplier mid-PO).
+   */
+  onCreateNew?: (typedText: string) => void;
+  createLabel?: string;
 }
 
 function normalizeOptions(options: SearchOption[]): { value: string; label: string }[] {
@@ -34,7 +40,15 @@ function normalize(s: string): string {
  * applies the exact value; typing alone never navigates. Enter picks
  * the first match, Escape reverts, × clears.
  */
-export function SearchSelect({ value, options, placeholder, onSelect, className = "w-56" }: SearchSelectProps) {
+export function SearchSelect({
+  value,
+  options,
+  placeholder,
+  onSelect,
+  className = "w-56",
+  onCreateNew,
+  createLabel = "Add",
+}: SearchSelectProps) {
   const opts = normalizeOptions(options);
   const labelFor = (v: string) => opts.find((o) => o.value === v)?.label ?? v;
 
@@ -109,7 +123,7 @@ export function SearchSelect({ value, options, placeholder, onSelect, className 
           ×
         </button>
       )}
-      {open && matches.length > 0 && (
+      {open && (matches.length > 0 || onCreateNew) && (
         <ul className="absolute z-20 mt-1 max-h-64 min-w-72 w-full overflow-y-auto rounded-md border border-zinc-200 bg-white shadow-lg">
           {matches.map((o) => (
             <li key={o.value}>
@@ -125,6 +139,23 @@ export function SearchSelect({ value, options, placeholder, onSelect, className 
           {truncated > 0 && (
             <li className="px-3 py-1.5 text-xs text-zinc-400">
               {truncated} more — keep typing to narrow
+            </li>
+          )}
+          {onCreateNew && (
+            <li className="border-t border-zinc-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onCreateNew(text.trim());
+                }}
+                className="block w-full px-3 py-1.5 text-left text-sm font-medium text-blue-700 hover:bg-blue-50"
+              >
+                ＋ {createLabel}
+                {text.trim() && !matches.some((m) => m.label === text.trim())
+                  ? ` “${text.trim()}”`
+                  : "…"}
+              </button>
             </li>
           )}
         </ul>

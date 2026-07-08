@@ -214,6 +214,61 @@ export async function fetchSuppliersAsObjects(): Promise<{ id: string; name: str
   return (data ?? []) as { id: string; name: string }[];
 }
 
+/** Full supplier rows for the management UI (bead 9bq.17). */
+export async function fetchSuppliersFull(): Promise<Row[]> {
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("suppliers")
+    .select("id,name,type,address_line1,address_line2,postcode,county,country,modified_at")
+    .order("name", { ascending: true })
+    .limit(2000);
+  if (error) throw new Error(`suppliers failed: ${error.message}`);
+  return (data ?? []) as Row[];
+}
+
+/** Single supplier for the edit form (bead 9bq.17). */
+export async function fetchSupplier(id: string): Promise<Row | null> {
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("suppliers")
+    .select("id,name,type,address_line1,address_line2,postcode,county,country")
+    .eq("id", id)
+    .limit(1);
+  if (error) throw new Error(`supplier failed: ${error.message}`);
+  return (data?.[0] as Row) ?? null;
+}
+
+export interface SupplierStats {
+  poCount: number;
+  totalSpend: number;
+  lastPoDate: string | null;
+}
+
+/** Light per-supplier stats for the management page (bead 9bq.17). */
+export async function fetchSupplierStats(supplierName: string): Promise<SupplierStats> {
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("accounts_overview")
+    .select("total_value,po_number")
+    .eq("supplier_name", supplierName)
+    .limit(5000);
+  if (error) throw new Error(`supplier stats failed: ${error.message}`);
+  const rows = (data ?? []) as Row[];
+
+  const { data: lastPo } = await sb
+    .from("active_po_list")
+    .select("last_release,updated_at")
+    .eq("supplier_name", supplierName)
+    .order("updated_at", { ascending: false })
+    .limit(1);
+
+  return {
+    poCount: rows.length,
+    totalSpend: rows.reduce((n, r) => n + (Number(r.total_value) || 0), 0),
+    lastPoDate: (lastPo?.[0]?.last_release ?? lastPo?.[0]?.updated_at ?? null) as string | null,
+  };
+}
+
 /** Legacy fetch_delivery_addresses — suppliers rows typed delivery/both. */
 export async function fetchDeliveryAddresses(): Promise<Row[]> {
   const sb = getSupabaseAdmin();

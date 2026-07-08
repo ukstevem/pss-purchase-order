@@ -15,6 +15,7 @@ export function AppSidebar() {
             { label: "Dashboard", href: "/purchase-order/" },
             { label: "PO List", href: "/purchase-order/po-list/" },
             { label: "Create PO", href: "/purchase-order/po/new/" },
+            { label: "Suppliers", href: "/purchase-order/suppliers/" },
           ],
         },
         {

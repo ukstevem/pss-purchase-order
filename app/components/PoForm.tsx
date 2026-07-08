@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { SearchSelect } from "@/components/SearchSelect";
+import { SupplierForm } from "@/components/SupplierForm";
 import { accounting } from "@/lib/format";
 import { allowedNextStatuses, type Row } from "@/lib/po-logic";
 import { createPo, savePoEdit, type PoFormItem, type PoFormPayload } from "@/app/po/actions";
@@ -77,6 +78,10 @@ export function PoForm({ mode, options, initial }: PoFormProps) {
     initial ? `${initial.projectId}:${initial.itemSeq}` : ""
   );
   const [supplierId, setSupplierId] = useState(initial?.supplierId ?? "");
+  // Add-supplier-mid-PO modal (bead 9bq.17): local supplier list so a newly
+  // created supplier is pickable without a page reload.
+  const [suppliers, setSuppliers] = useState(options.suppliers);
+  const [newSupplierName, setNewSupplierName] = useState<string | null>(null);
   const [addressId, setAddressId] = useState(initial?.deliveryAddressId ?? "");
   const [contactId, setContactId] = useState(initial?.deliveryContactId ?? "");
   const [manualName, setManualName] = useState("");
@@ -106,8 +111,8 @@ export function PoForm({ mode, options, initial }: PoFormProps) {
     [options.projectItems]
   );
   const supplierOptions = useMemo(
-    () => options.suppliers.map((s) => ({ value: s.id, label: s.name })),
-    [options.suppliers]
+    () => suppliers.map((s) => ({ value: s.id, label: s.name })),
+    [suppliers]
   );
 
   // Legacy filterContacts: contacts limited to the selected address.
@@ -224,9 +229,28 @@ export function PoForm({ mode, options, initial }: PoFormProps) {
               placeholder="Select supplier…"
               onSelect={setSupplierId}
               className="w-full"
+              onCreateNew={(typed) => setNewSupplierName(typed)}
+              createLabel="Add new supplier"
             />
           )}
         </div>
+
+        {newSupplierName !== null && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="max-h-full w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+              <h2 className="mb-4 text-lg font-semibold text-zinc-900">Add Supplier</h2>
+              <SupplierForm
+                initial={{ name: newSupplierName, type: "supplier" }}
+                onCancel={() => setNewSupplierName(null)}
+                onSaved={(id, name) => {
+                  setSuppliers((prev) => [...prev, { id, name }].sort((a, b) => a.name.localeCompare(b.name)));
+                  setSupplierId(id);
+                  setNewSupplierName(null);
+                }}
+              />
+            </div>
+          </div>
+        )}
         <div>
           <label className={labelCls}>Delivery Address</label>
           <select
