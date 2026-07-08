@@ -184,6 +184,7 @@ export function PoForm({ mode, options, initial }: PoFormProps) {
   const showBump = mode === "edit" && ["approved", "issued"].includes(currentStatus);
 
   return (
+    <>
     <form
       onSubmit={submit}
       onKeyDown={(e) => {
@@ -235,23 +236,6 @@ export function PoForm({ mode, options, initial }: PoFormProps) {
           )}
         </div>
 
-        {newSupplierName !== null && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="max-h-full w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
-              <h2 className="mb-4 text-lg font-semibold text-zinc-900">Add Supplier</h2>
-              <SupplierForm
-                initial={{ name: newSupplierName, type: "supplier" }}
-                lockType
-                onCancel={() => setNewSupplierName(null)}
-                onSaved={(id, name) => {
-                  setSuppliers((prev) => [...prev, { id, name }].sort((a, b) => a.name.localeCompare(b.name)));
-                  setSupplierId(id);
-                  setNewSupplierName(null);
-                }}
-              />
-            </div>
-          </div>
-        )}
         <div>
           <label className={labelCls}>Delivery Address</label>
           <select
@@ -503,5 +487,27 @@ export function PoForm({ mode, options, initial }: PoFormProps) {
         </button>
       </div>
     </form>
+
+    {/* Add-supplier modal — OUTSIDE the PO form: nested <form> elements are
+        invalid HTML, and the browser dropping the inner form made the
+        supplier save silently submit the PO form instead (bead 9bq.17). */}
+    {newSupplierName !== null && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="max-h-full w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+          <h2 className="mb-4 text-lg font-semibold text-zinc-900">Add Supplier</h2>
+          <SupplierForm
+            initial={{ name: newSupplierName, type: "supplier" }}
+            lockType
+            onCancel={() => setNewSupplierName(null)}
+            onSaved={(id, name) => {
+              setSuppliers((prev) => [...prev, { id, name }].sort((a, b) => a.name.localeCompare(b.name)));
+              setSupplierId(id);
+              setNewSupplierName(null);
+            }}
+          />
+        </div>
+      </div>
+    )}
+    </>
   );
 }

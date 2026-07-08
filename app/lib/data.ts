@@ -214,12 +214,17 @@ export async function fetchSuppliersAsObjects(): Promise<{ id: string; name: str
   return (data ?? []) as { id: string; name: string }[];
 }
 
-/** Full supplier rows for the management UI (bead 9bq.17). */
+/**
+ * Full supplier rows for the management UI (bead 9bq.17). Lists only rows
+ * we buy from — type supplier or both; pure delivery addresses are excluded
+ * (Steve, 2026-07-07).
+ */
 export async function fetchSuppliersFull(): Promise<Row[]> {
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
     .from("suppliers")
     .select("id,name,type,address_line1,address_line2,postcode,county,country,modified_at")
+    .in("type", ["supplier", "both"])
     .order("name", { ascending: true })
     .limit(2000);
   if (error) throw new Error(`suppliers failed: ${error.message}`);
