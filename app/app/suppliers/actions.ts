@@ -65,15 +65,20 @@ export async function createSupplier(
     const { data, error } = await sb.from("suppliers").select("name").limit(2000);
     if (error) return { ok: false, error: error.message };
     const target = normalizeName(v.row.name!);
-    const targetTokens = new Set(target.split(" "));
+    // Meaningful tokens only (drops initials like "C." and short glue words)
+    const targetTokens = new Set(target.split(" ").filter((t) => t.length > 2));
     const near = (data ?? [])
       .map((r) => String(r.name))
       .filter((existing) => {
         const n = normalizeName(existing);
         if (n === target) return true;
         const tokens = n.split(" ").filter((t) => t.length > 2);
+        if (!tokens.length || !targetTokens.size) return false;
         const overlap = tokens.filter((t) => targetTokens.has(t)).length;
-        return tokens.length > 0 && overlap / tokens.length >= 0.6;
+        // Ratio against the SHORTER name: typing a subset of an existing
+        // supplier ("Roberts Steel" for "C. Roberts Steel Services Ltd.")
+        // is exactly the duplicate-entry risk — it must trip the warning.
+        return overlap / Math.min(tokens.length, targetTokens.size) >= 0.6;
       })
       .slice(0, 5);
     if (near.length) return { ok: false, duplicates: near };
