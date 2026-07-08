@@ -46,14 +46,18 @@ export function SearchSelect({ value, options, placeholder, onSelect, className 
   useEffect(() => setText(value ? labelFor(value) : ""), [value]);
 
   const tokens = normalize(text).split(" ").filter(Boolean);
-  const matches = (
-    tokens.length
-      ? opts.filter((o) => {
-          const n = normalize(o.label);
-          return tokens.every((t) => n.includes(t));
-        })
-      : opts
-  ).slice(0, 50);
+  // Render cap high enough that current pick-lists (≤~500) show in full —
+  // a 50-row cap made the project list appear truncated (bead fwo). The
+  // dropdown already scrolls; the footer hint covers genuine truncation.
+  const RENDER_CAP = 500;
+  const allMatches = tokens.length
+    ? opts.filter((o) => {
+        const n = normalize(o.label);
+        return tokens.every((t) => n.includes(t));
+      })
+    : opts;
+  const matches = allMatches.slice(0, RENDER_CAP);
+  const truncated = allMatches.length - matches.length;
 
   useEffect(() => {
     function onDocMouseDown(e: MouseEvent) {
@@ -118,6 +122,11 @@ export function SearchSelect({ value, options, placeholder, onSelect, className 
               </button>
             </li>
           ))}
+          {truncated > 0 && (
+            <li className="px-3 py-1.5 text-xs text-zinc-400">
+              {truncated} more — keep typing to narrow
+            </li>
+          )}
         </ul>
       )}
     </div>
