@@ -23,12 +23,14 @@ interface SupplierFormProps {
   /** Called with the saved supplier's id + name after a successful save. */
   onSaved: (id: string, name: string) => void;
   onCancel?: () => void;
+  /** Mid-PO modal: the new record is by definition a supplier (Steve). */
+  lockType?: boolean;
 }
 
 const inputCls = "w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm";
 const labelCls = "mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-500";
 
-export function SupplierForm({ initial, onSaved, onCancel }: SupplierFormProps) {
+export function SupplierForm({ initial, onSaved, onCancel, lockType = false }: SupplierFormProps) {
   const editing = Boolean(initial?.id);
   const [name, setName] = useState(initial?.name ?? "");
   const [type, setType] = useState(initial?.type ?? "supplier");
@@ -124,16 +126,18 @@ export function SupplierForm({ initial, onSaved, onCancel }: SupplierFormProps) 
         <label className={labelCls}>Name *</label>
         <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} required />
       </div>
-      <div>
-        <label className={labelCls}>Type *</label>
-        <select className={inputCls} value={type} onChange={(e) => setType(e.target.value)}>
-          {TYPE_OPTIONS.map((t) => (
-            <option key={t.value} value={t.value}>
-              {t.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      {!lockType && (
+        <div>
+          <label className={labelCls}>Type *</label>
+          <select className={inputCls} value={type} onChange={(e) => setType(e.target.value)}>
+            {TYPE_OPTIONS.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className={labelCls}>Address Line 1</label>

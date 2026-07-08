@@ -241,6 +241,7 @@ export function PoForm({ mode, options, initial }: PoFormProps) {
               <h2 className="mb-4 text-lg font-semibold text-zinc-900">Add Supplier</h2>
               <SupplierForm
                 initial={{ name: newSupplierName, type: "supplier" }}
+                lockType
                 onCancel={() => setNewSupplierName(null)}
                 onSaved={(id, name) => {
                   setSuppliers((prev) => [...prev, { id, name }].sort((a, b) => a.name.localeCompare(b.name)));
