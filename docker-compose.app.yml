@@ -51,8 +51,18 @@ services:
       MS_OUTLOOK_MAILBOX: ${MS_OUTLOOK_MAILBOX:-}
     ports:
       - "3017:3017"
+    # Liveness only (bead 6el, estate convention in
+    # PSS-Admin/docs/health-endpoints.md). This used to wget the dashboard,
+    # which ran a whole-table Supabase fetch every 30s for nobody — 2,880
+    # renders/day (bead i7w).
+    #   127.0.0.1, not localhost: alpine resolves localhost to ::1 first and
+    #   Next standalone with HOSTNAME=0.0.0.0 binds IPv4 only, so busybox wget
+    #   never retries the v4 address after the v6 connection is refused.
+    #   GET (-O /dev/null), not --spider, which sends HEAD.
+    #   Trailing slash is deliberate: next.config.ts sets trailingSlash, so the
+    #   unslashed path answers 308 and costs every probe an extra round trip.
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3017/purchase-order/"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3017/purchase-order/api/health/"]
       interval: 30s
       timeout: 5s
       retries: 3
