@@ -18,54 +18,36 @@ export interface ProjectPoSummary {
  * PO counts still aggregate from active_po_list per the legacy rule
  * (fetch_project_po_summary, supabase_client.py:979). Projects with no POs
  * are included with zero counts.
+ *
+ * The aggregation itself lives in Postgres (db/po_project_summary.sql, bead
+ * i7w). It used to run here, over every project_register row and every
+ * active_po_list row fetched on each render — 3 requests and ~1,850 rows a
+ * time, which two monitors turned into ~26k Supabase requests/day. Counting
+ * semantics are unchanged and deliberately still legacy: active is every
+ * non-draft status, cancelled and complete included (bead k7n).
  */
 export async function fetchProjectPoSummary(): Promise<ProjectPoSummary[]> {
   const sb = getSupabaseAdmin();
-  const projRes = await sb.from("project_register").select("projectnumber").limit(10000);
-  if (projRes.error) throw new Error(`project_register failed: ${projRes.error.message}`);
 
-  // Offset-loop past PostgREST's 1000-row cap (bead 9bq.9 — unpaginated,
-  // the aggregation silently truncated and undercounted projects).
+  // Paged only so a project_register that outgrows PostgREST's 1000-row cap
+  // can't silently truncate the dashboard the way the old unpaginated PO
+  // fetch did (bead 9bq.9). At 313 projects this is a single request.
   const pageSize = 1000;
   let offset = 0;
-  const poRows: Row[] = [];
+  const rows: ProjectPoSummary[] = [];
   for (;;) {
     const { data, error } = await sb
-      .from("active_po_list")
-      .select("project_id,status")
-      .order("po_number", { ascending: true })
+      .from("project_po_summary")
+      .select("project_id,draft,active")
+      .order("project_id", { ascending: true })
       .range(offset, offset + pageSize - 1);
-    if (error) throw new Error(`active_po_list summary failed: ${error.message}`);
-    const batch = (data ?? []) as Row[];
-    poRows.push(...batch);
+    if (error) throw new Error(`project_po_summary failed: ${error.message}`);
+    const batch = (data ?? []) as ProjectPoSummary[];
+    rows.push(...batch);
     if (batch.length < pageSize) break;
     offset += pageSize;
   }
-
-  const counts = new Map<string, { draft: number; active: number }>();
-  for (const row of poRows) {
-    const pn = String(row.project_id ?? "").trim();
-    if (!pn) continue;
-    const c = counts.get(pn) ?? { draft: 0, active: 0 };
-    const status = String(row.status ?? "").toLowerCase();
-    // Legacy counts every non-draft status (incl. cancelled/complete) as active.
-    if (status === "draft") c.draft += 1;
-    else c.active += 1;
-    counts.set(pn, c);
-  }
-
-  const numbers = [
-    ...new Set(
-      (projRes.data ?? [])
-        .map((r: Row) => String(r.projectnumber ?? "").trim())
-        .filter(Boolean)
-    ),
-  ];
-  return numbers.map((pn) => ({
-    project_id: pn,
-    draft: counts.get(pn)?.draft ?? 0,
-    active: counts.get(pn)?.active ?? 0,
-  }));
+  return rows;
 }
 
 export interface PoListFilters {
